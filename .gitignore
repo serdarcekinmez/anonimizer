@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.tools/
+.pytest_cache/
+.ruff_cache/
+.pyright/
+.hypothesis/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Personal Claude Code settings and local state
+.claude/settings.local.json
+.claude/*.local.*
+CLAUDE.local.md
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+
+# Data files are never committed, except registered synthetic fixtures
+*.csv
+*.tsv
+*.xlsx
+*.xlsm
+*.xls
+*.xlsb
+*.parquet
+*.sqlite
+*.db
+!tests/fixtures/**
+!tests/corpus/**
+!tests/adversarial/**
+
+# Local outputs, logs, uncommitted reference snapshots
+out/
+output/
+*.log
+docs/compliance/cnil/snapshot/
+
+# Editors and OS
+.vscode/
+.idea/
+.DS_Store
