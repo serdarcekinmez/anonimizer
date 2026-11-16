@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import pytest
-from score_detection import score
 
 from anonimizer.profile import build_profile, iter_exceptions
+from score_detection import score
 from tests.conftest import PRODUCT_FILES
 
 # Findings the builder did not list, each checked by hand. They are real properties of the

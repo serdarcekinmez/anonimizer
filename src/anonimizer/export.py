@@ -21,6 +21,7 @@ from .policy import EXTERNAL_CANDIDATE, LOCAL_ONLY, RESTRICTED, TIER_ORDER
 _NEWLINES = {"lf": "\n", "crlf": "\r\n", "cr": "\r"}
 _ILLEGAL_XML = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f]")
 _FIXED_TIME = (2000, 1, 1, 0, 0, 0)
+_STAMP = re.compile(rb"(<dcterms:(?:created|modified)[^>]*>)[^<]*(</dcterms:(?:created|modified)>)")
 MAX_LEAD = 50
 MAX_GAP = 20
 
@@ -229,7 +230,11 @@ def _xlsx_bytes(grids: dict[str, dict], layout: dict) -> bytes:
             info = zipfile.ZipInfo(item.filename, date_time=(1980, 1, 1, 0, 0, 0))
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o600 << 16
-            dst.writestr(info, src.read(item.filename))
+            data = src.read(item.filename)
+            if item.filename == "docProps/core.xml":
+                # The library stamps the save time; pin it so output does not depend on the clock.
+                data = _STAMP.sub(rb"\g<1>2000-01-01T00:00:00Z\g<2>", data)
+            dst.writestr(info, data)
     return out.getvalue()
 
 

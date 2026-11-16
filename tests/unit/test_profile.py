@@ -8,7 +8,6 @@ import anonimizer.profile as profile_mod
 from anonimizer.policy import get_policy
 from anonimizer.profile import build_profile, iter_exceptions, to_shareable
 from anonimizer.recipe import ParseRecipe
-from tests.conftest import product_path
 
 
 def _col(prof, name, table=0):

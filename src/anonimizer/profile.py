@@ -284,6 +284,9 @@ def _resolve_dates(classes: dict) -> tuple[list, str, bool]:
         order = "ambiguous" if x_cnt else "n/a"
     conflict = bool(d_cnt and m_cnt)
     prefix = {"DMY": "D/M/", "MDY": "M/D/"}.get(order)
+    full = sum(e[0] for k, e in classes.items() if k[0] == DATE and "B" in k[1])
+    abbr = sum(e[0] for k, e in classes.items() if k[0] == DATE and "b" in k[1])
+    month_tok = "B" if full > abbr else "b"
     recs = []
     for k, e in classes.items():
         if k[0] != DATE:
@@ -291,6 +294,8 @@ def _resolve_dates(classes: dict) -> tuple[list, str, bool]:
         sub = k[1]
         if prefix and sub.startswith("X/X/"):
             sub = prefix + sub[4:]
+        if "e" in sub and not sub.startswith("excel"):
+            sub = sub.replace("e", month_tok)  # "May" takes the form the rest of the column uses
         recs.append((sub, k[2], k[3], k[6], e[0], e[1]))
     return recs, order, conflict
 

@@ -165,6 +165,17 @@ def _full_year(y: str) -> int:
     return v if len(y) > 2 else (2000 + v if v < 70 else 1900 + v)
 
 
+_ABBREVIATIONS = frozenset({"sept", "janv", "févr", "fév", "fev", "avr", "juil", "déc"})
+
+
+def _month_token(name: str) -> str:
+    """b: abbreviated, B: full, e: either (May is its own abbreviation); resolved per column."""
+    low = name.lower()
+    if low in ("may", "mai"):
+        return "e"
+    return "b" if len(low) <= 3 or low in _ABBREVIATIONS else "B"
+
+
 def _date(s: str) -> V | None:
     c0 = s[0]
     if c0.isdigit():
@@ -229,9 +240,7 @@ def _date(s: str) -> V | None:
             if mo is None:
                 return None
             y = _full_year(m.group(4))
-            tok = "b" if len(m.group(3)) <= 4 and m.group(3).lower() not in ("may", "mai", "mars", "june", "july", "juin") else "B"
-            if m.group(3).lower() in ("may", "mai"):
-                tok = "b"
+            tok = _month_token(m.group(3))
             sub = f"D{m.group(2)}{tok}{m.group(2)}{'Y' if len(m.group(4)) == 4 else 'y'}"
             return V(DATE, sub, 0 if _valid(y, mo, int(m.group(1))) else INVALID, y)
         m = _TIME.fullmatch(s)
@@ -246,7 +255,7 @@ def _date(s: str) -> V | None:
             if mo is None:
                 return None
             y = int(m.group(3))
-            tok = "b" if len(m.group(1)) <= 4 else "B"
+            tok = _month_token(m.group(1))
             return V(DATE, f"{tok} D, Y" if "," in s else f"{tok} D Y",
                      0 if _valid(y, mo, int(m.group(2))) else INVALID, y)
     return None

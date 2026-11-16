@@ -66,7 +66,7 @@ def test_number_flags():
     ("2024-01-05", "Y-M-D", False), ("2024-02-30", "Y-M-D", True), ("2021-13-01", "Y-M-D", True),
     ("13/01/2024", "D/M/Y", False), ("01/13/2024", "M/D/Y", False), ("13/13/2024", "X/X/Y", True),
     ("31.12.2023", "D.M.Y", False), ("31.02.2023", "D.M.Y", True), ("12-Jan-2024", "D-b-Y", False),
-    ("Jan 5, 2024", "b D, Y", False), ("2024-01-05T10:22:01Z", "Y-M-DTh:m:sZ", False), ("12:30", "h:m", False),
+    ("Jan 5, 2024", "b D, Y", False), ("5 January 2024", "D B Y", False), ("5 May 2024", "D e Y", False), ("2024-01-05T10:22:01Z", "Y-M-DTh:m:sZ", False), ("12:30", "h:m", False),
     ("29/02/2023", "D/M/Y", True), ("29/02/2024", "D/M/Y", False),
 ])
 def test_dates(raw, sub, invalid):

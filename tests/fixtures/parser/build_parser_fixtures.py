@@ -7,7 +7,7 @@ import os
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 FILES: dict[str, bytes] = {
-    "semicolon_decimal_comma.csv": "id;montant;date\n1;12,5;01/02/2024\n2;7,25;15/02/2024\n3;100,00;28/02/2024\n".encode(),
+    "semicolon_decimal_comma.csv": b"id;montant;date\n1;12,5;01/02/2024\n2;7,25;15/02/2024\n3;100,00;28/02/2024\n",
     "utf16_bom.csv": "id,label\n1,été\n2,hiver\n".encode("utf-16"),
     "utf8_bom.csv": b"\xef\xbb\xbfid,label\n1,alpha\n2,beta\n",
     "cp1252_accents.csv": "ref;libellé;prix\nA1;crème brûlée;4,50\nA2;café;1,20\nA3;thé;2,00\n".encode("cp1252"),

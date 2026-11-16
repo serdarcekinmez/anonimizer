@@ -431,7 +431,7 @@ class _TableGen:
                 v = d if first_x else m
                 first_x = False
                 out.append(f"{v:02d}" if pad else str(v))
-            elif ch == "b":
+            elif ch == "b" or ch == "e":
                 out.append(_MON_ABBR[(m - 1) % 12])
             elif ch == "B":
                 out.append(_MON_FULL[(m - 1) % 12])
@@ -744,7 +744,14 @@ def _generate_table(tg: _TableGen, tab: dict, n: int, plan: dict) -> dict:
     for _ in range(n_typ):
         data.append({"cells": [tg.typical(c) for c in cols], "extra": [], "kind": "typical", "tags": [], "after": None})
     typical_rows = list(data)
-    for r in prows:
+
+    def _needs_source(r: dict) -> bool:
+        if r["row"] is not None:
+            return r["row"]["gen"]["g"] == "duplicate_row"
+        return any(sc["gen"]["g"] == "duplicate_key" for sc, _i in r["slots"].values())
+
+    # Rows that copy from another row are built last, so that a source row always exists.
+    for r in sorted(prows, key=_needs_source):
         row = {"cells": None, "extra": [], "kind": "scenario", "tags": [], "after": None}
         rsc = r["row"]
         if rsc is not None:
@@ -789,7 +796,10 @@ def _generate_table(tg: _TableGen, tab: dict, n: int, plan: dict) -> dict:
             if kind == "key_multiplicity":
                 cells.append(group_values[sc["id"]])
             elif kind == "duplicate_key":
-                src = [x for x in typical_rows if x["cells"][cols.index(c)].text]
+                j = cols.index(c)
+                src = [x for x in typical_rows if len(x["cells"]) > j and x["cells"][j].text] or \
+                      [x for x in data if x["after"] is None and len(x["cells"]) > j and x["cells"][j].text
+                       and x["cells"][j].kind != ""]
                 if not src:
                     cells.append(tg.typical(c, False))
                     fail(sc, "no earlier key value exists to repeat")
