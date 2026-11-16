@@ -542,12 +542,12 @@ def plan_table(tab: dict, n_rows: int, packing: str = "auto") -> dict:
     kept = {c["id"] for c in tab["columns"] if c["keep"]}
     usable, skipped = [], []
     for sc in tab["scenarios"]:
-        if not sc.get("enabled", True):
-            skipped.append((sc, "disabled in the contract"))
+        if not sc.get("reproducible") or not sc.get("gen"):
+            skipped.append((sc, sc.get("not_reproduced_reason") or "no generator exists for this class"))
         elif sc.get("column") is not None and sc["column"] not in kept:
             skipped.append((sc, "its column is dropped by the contract"))
-        elif not sc.get("reproducible") or not sc.get("gen"):
-            skipped.append((sc, sc.get("not_reproduced_reason") or "no generator exists for this class"))
+        elif not sc.get("enabled", True):
+            skipped.append((sc, "disabled in the contract"))
         else:
             usable.append(sc)
     usable.sort(key=lambda s: (not s.get("pinned"), s["priority"], bool(s.get("common")), s["id"]))

@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anonimizer</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1>Anonimizer</h1>
+  <p>Runs on this machine only. No file, value or report is sent anywhere.</p>
+</header>
+<div id="msg" role="status" aria-live="polite"></div>
+<main>
+  <section id="s-file">
+    <h2><span class="step">1</span> Source file</h2>
+    <p class="hint">CSV, TSV or XLSX. Open it by path (nothing is copied), or pick it to copy it into a private temporary folder for this session.</p>
+    <div class="row">
+      <label for="path">Path</label>
+      <input id="path" type="text" placeholder="/path/to/file.csv" autocomplete="off" spellcheck="false">
+      <button id="btn-open" class="primary">Open</button>
+      <span class="or">or</span>
+      <input id="file" type="file" accept=".csv,.tsv,.txt,.tab,.xlsx,.xlsm">
+    </div>
+  </section>
+
+  <section id="s-regions" hidden>
+    <h2><span class="step">2</span> Tables and regions</h2>
+    <div id="file-facts" class="facts"></div>
+    <p class="hint">Detected automatically. Correct any row or column number (1-based, as in a spreadsheet), untick a region to leave it out, then apply. Low confidence means: check it.</p>
+    <div id="regions"></div>
+    <div class="row">
+      <label for="ov-delim">Delimiter</label><input id="ov-delim" type="text" class="short" placeholder="auto">
+      <label for="ov-enc">Encoding</label><input id="ov-enc" type="text" class="short" placeholder="auto">
+      <label for="ov-markers">Extra missing markers</label><input id="ov-markers" type="text" placeholder="comma-separated, e.g. s/o, vide">
+    </div>
+    <div class="row">
+      <button id="btn-recipe">Apply corrections</button>
+      <button id="btn-recipe-reset">Back to automatic detection</button>
+    </div>
+  </section>
+
+  <section id="s-policy" hidden>
+    <h2><span class="step">3</span> Privacy policy and profile</h2>
+    <p class="hint">A policy must be chosen; there is no default. It decides how rare patterns and small counts are generalised before anything is derived from the file.</p>
+    <div id="policies"></div>
+    <div class="row"><button id="btn-profile" class="primary">Profile the file</button></div>
+  </section>
+
+  <section id="s-report" hidden>
+    <h2><span class="step">4</span> Data-quality report and Exception Catalogue</h2>
+    <div id="report"></div>
+  </section>
+
+  <section id="s-contract" hidden>
+    <h2><span class="step">5</span> Dataset Contract</h2>
+    <p class="hint">These are proposals. Decide what to keep, classify each column, and choose which exception scenarios to generate. Values are synthetic unless you approve copying the frequent values of a categorical column.</p>
+    <div id="contract"></div>
+    <div class="row">
+      <label for="approved-by">Approver of copied category values</label><input id="approved-by" type="text" autocomplete="off">
+    </div>
+    <div class="row">
+      <label for="confirm-by">I reviewed this contract (name)</label><input id="confirm-by" type="text" autocomplete="off">
+      <span class="hint">Required for the RESTRICTED tier. Without it the output is LOCAL_ONLY.</span>
+    </div>
+    <div class="row"><button id="btn-contract">Apply decisions</button><span id="contract-state" class="hint"></span></div>
+  </section>
+
+  <section id="s-generate" hidden>
+    <h2><span class="step">6</span> Generate</h2>
+    <div class="row">
+      <label for="rows">Synthetic rows</label><input id="rows" type="number" min="1" value="50" class="short">
+      <label for="seed">Seed</label><input id="seed" type="text" value="0" class="short">
+      <label for="packing">Scenario packing</label>
+      <select id="packing"><option value="auto">auto</option><option value="isolate">one scenario per row</option><option value="packed">pack as many as possible</option></select>
+    </div>
+    <div id="rows-for" class="row"></div>
+    <div class="row"><button id="btn-generate" class="primary">Generate synthetic dataset</button></div>
+  </section>
+
+  <section id="s-result" hidden>
+    <h2><span class="step">7</span> Result</h2>
+    <div id="result"></div>
+  </section>
+</main>
+<footer><p id="statement"></p><p id="version"></p></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

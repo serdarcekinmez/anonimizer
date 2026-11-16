@@ -216,6 +216,13 @@ def cmd_policies(_args) -> int:
     return EXIT_OK
 
 
+def cmd_transform(_args) -> int:
+    print("Mode A (full dataset conversion: pseudonymisation, generalisation, synthetic at scale) is not available "
+          "in this release. None of its strategies has been implemented and assessed, so none is offered. "
+          "Use 'generate' (Mode B) to produce a synthetic test dataset.", file=sys.stderr)
+    return EXIT_INPUT
+
+
 def cmd_ui(args) -> int:
     from .ui.server import serve
 
@@ -280,6 +287,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("policies", help="list the shipped privacy policies")
     sp.set_defaults(func=cmd_policies)
+
+    sp = sub.add_parser("transform", help="Mode A, full dataset conversion (not available in this release)")
+    sp.add_argument("file", nargs="?")
+    sp.set_defaults(func=cmd_transform)
 
     sp = sub.add_parser("ui", help="start the local web interface (loopback only)")
     sp.add_argument("--port", type=int, default=0, help="port (default: a free random port)")
