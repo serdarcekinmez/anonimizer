@@ -10,7 +10,7 @@ import json
 from dataclasses import dataclass, field
 
 from .grid import GridError, GridSource, open_source
-from .regions import Region, detect_regions
+from .regions import Region, detect_regions, layout_kinds
 
 RECIPE_VERSION = 1
 
@@ -162,5 +162,13 @@ def propose_recipe(path: str, recipe: ParseRecipe | None = None) -> tuple[ParseR
     return out, source, regions
 
 
+def region_layout(path: str, recipe: ParseRecipe | None, index: int, max_rows: int = 8, max_cols: int = 40) -> dict:
+    """Cell kinds of the first rows of the region at ``index`` of the proposed recipe. No cell value."""
+    _proposed, source, regions = propose_recipe(path, recipe)
+    if isinstance(index, bool) or not isinstance(index, int) or not 0 <= index < len(regions):
+        raise RecipeError("no such region")
+    return layout_kinds(source, regions[index], max_rows, max_cols)
+
+
 __all__ = ["ParseRecipe", "RecipeError", "GridError", "propose_recipe", "resolve_regions", "region_to_spec",
-           "spec_to_region"]
+           "spec_to_region", "region_layout"]

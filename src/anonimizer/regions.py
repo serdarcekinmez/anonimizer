@@ -279,3 +279,22 @@ def _name_regions(regions: list[Region], source: GridSource) -> None:
             r.name = base if tables_in_sheet[r.sheet] == 1 else f"{base}#{per_sheet[r.sheet]}"
         else:
             r.name = f"table_{n_tab}"
+
+
+def layout_kinds(source: GridSource, region: Region, max_rows: int = 8, max_cols: int = 40) -> dict:
+    """Kinds of the first cells of a region (text, number, date ...), for a preview. Never a cell value."""
+    last_col = min(region.col_end, region.col_start + max_cols)
+    date1904 = bool(getattr(source, "info", {}).get("date1904"))
+    rows = []
+    for row in source.rows(region.sheet):
+        if row.index < region.top:
+            continue
+        if row.index > region.bottom or len(rows) >= max_rows:
+            break
+        role = "header" if row.index == region.header_row else "data" if row.index >= region.data_start else "intro"
+        kinds = ["empty" if i >= len(row.raw) or row.raw[i] is None else _family(row, i, date1904)
+                 for i in range(region.col_start, last_col)]
+        rows.append({"row": row.index + 1, "role": role, "kinds": kinds})
+    return {"first_col": region.col_start + 1, "columns": last_col - region.col_start,
+            "columns_total": region.col_end - region.col_start, "rows": rows,
+            "rows_total": region.bottom - region.top + 1}

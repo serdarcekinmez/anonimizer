@@ -30,14 +30,15 @@ from ..export import ExportRefused
 from ..grid import GridError, open_source
 from ..pipeline import apply_decisions, generate_and_export, inspect, profile_source
 from ..policy import POLICIES, PolicyError, get_policy
-from ..recipe import ParseRecipe, RecipeError
+from ..recipe import ParseRecipe, RecipeError, region_layout
 from ..reports import summarize_profile
-from ..synth import SynthError
+from ..synth import SynthError, generate
 
 STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_JSON = 5 * 1024 * 1024
 MAX_UPLOAD = 4 * 1024**3
 COOKIE = "anonimizer_session"
+LAYOUT_ROWS, LAYOUT_COLS, SAMPLE_ROWS = 8, 40, 6
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
        "form-action 'none'; frame-ancestors 'none'; base-uri 'none'")
@@ -110,6 +111,33 @@ class Session:
             self.recipe = recipe
         self.private = self.shareable = self.contract = self.result = None
         return self.inspect()
+
+    def layout(self, body: dict) -> dict:
+        """Kinds of the first cells of one region (text, number, date ...), never their values."""
+        self._need_file()
+        index = body.get("index")
+        out = region_layout(self.path, self.recipe, index, LAYOUT_ROWS, LAYOUT_COLS)
+        out["index"] = index
+        return out
+
+    def sample(self, _body: dict) -> dict:
+        """A few synthetic rows per table, generated from the applied contract only. Nothing is exported."""
+        if self.contract is None:
+            raise ApiError(409, "profile the file first")
+        contract = json.loads(json.dumps(self.contract))
+        for tab in contract["tables"]:
+            for sc in tab["scenarios"]:
+                sc["enabled"] = False  # typical values only; the exceptions are listed per column
+        try:
+            out = generate(contract, {"*": SAMPLE_ROWS}, "preview")
+        except SynthError:
+            return {"tables": {}}
+        tables = {}
+        for name, tab in out["tables"].items():
+            data = [r for r in tab["rows"] if r["kind"] == "data"][:SAMPLE_ROWS]
+            tables[name] = {"columns": tab["columns"],
+                            "rows": [["" if c.text is None else c.text[:60] for c in r["cells"]] for r in data]}
+        return {"tables": tables}
 
     def profile(self, body: dict) -> dict:
         self._need_file()
@@ -339,7 +367,8 @@ class Handler(BaseHTTPRequestHandler):
                 body = self._body_json()
                 routes = {"/api/open": lambda: s.open_path(body.get("path")), "/api/recipe": lambda: s.set_recipe(body),
                           "/api/profile": lambda: s.profile(body), "/api/contract": lambda: s.decide(body),
-                          "/api/generate": lambda: s.generate(body), "/api/save": lambda: s.save_bundle(body)}
+                          "/api/generate": lambda: s.generate(body), "/api/save": lambda: s.save_bundle(body),
+                          "/api/layout": lambda: s.layout(body), "/api/sample": lambda: s.sample(body)}
                 handler = routes.get(url.path)
                 if handler is None:
                     return self._json(404, {"error": "not found"})

@@ -201,3 +201,37 @@ def test_session_folder_is_removed(ui):
     assert os.path.isdir(workdir) and oct(os.stat(workdir).st_mode & 0o777) == "0o700"
     session.cleanup()
     assert not os.path.exists(workdir)
+
+
+def test_layout_and_sample_previews_carry_no_source_value(ui, truths):
+    c, _server, _session = ui
+    status, err = c.post("/api/layout", {"index": 0})
+    assert status == 409  # no file yet
+    status, data = c.post("/api/open", {"path": product_path("orders_multi.tsv")})
+    assert status == 200
+    status, err = c.post("/api/sample", {})
+    assert status == 409 and "profile" in err["error"]
+    for bad in (None, -1, 99, "1", True):
+        status, err = c.post("/api/layout", {"index": bad})
+        assert status == 400 and "no such region" in err["error"]
+    blobs = []
+    for i, spec in enumerate(data["recipe"]["tables"]):
+        status, lay = c.post("/api/layout", {"index": i})
+        assert status == 200 and 1 <= len(lay["rows"]) <= 8 and lay["rows"][0]["row"] == spec["first_row"]
+        assert all(len(r["kinds"]) == lay["columns"] for r in lay["rows"])
+        # A layout answer is made of row numbers, roles and cell kinds, and of nothing else.
+        assert {k for r in lay["rows"] for k in r["kinds"]} <= {"text", "number", "date", "bool", "missing", "error", "empty"}
+        assert {r["role"] for r in lay["rows"]} <= {"header", "intro", "data"}
+        blobs.append(json.dumps(lay, ensure_ascii=False))
+    status, lay = c.post("/api/layout", {"index": 1})
+    assert [r["role"] for r in lay["rows"]][:2] == ["header", "data"] and lay["rows"][0]["row"] == 4
+    assert c.post("/api/profile", {"policy": "external-strict"})[0] == 200
+    status, sample = c.post("/api/sample", {})
+    assert status == 200 and set(sample["tables"]) == {"table_1", "table_2"}
+    assert sample["tables"]["table_1"]["columns"][0] == "c1" and 1 <= len(sample["tables"]["table_1"]["rows"]) <= 6
+    blobs.append(json.dumps(sample, ensure_ascii=False))
+    for canary in truths["orders_multi.tsv"]["canaries"] + ["ORD-000001", "livraison", "Ventoux"]:
+        assert all(canary not in blob for blob in blobs)
+    # A new recipe withdraws the contract, and the sample with it.
+    assert c.post("/api/recipe", {"reset": True})[0] == 200
+    assert c.post("/api/sample", {})[0] == 409

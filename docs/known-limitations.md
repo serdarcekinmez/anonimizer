@@ -50,7 +50,12 @@ See [privacy-limitations.md](privacy-limitations.md) and [threat-model.md](threa
 
 - One user, one file, one session. State lives in memory and in a private temporary folder removed on exit.
 - Checked by server tests and by running the page script in an embedded JavaScript engine. Not yet exercised in a real browser by the developer.
-- No progress bar: profiling a file of several hundred megabytes shows "Profiling every cell" until it is done.
+- No progress bar: analysing a file of several hundred megabytes shows "Analysing every cell" until it is done.
+- The page never receives the values of the source file. The region preview shows the kind of each cell (text, number, date, missing) for the first eight rows; the column grid shows synthetic sample rows of ordinary values produced from the applied contract. Neither is a view of the source rows, so a wrong header or boundary has to be recognised from cell kinds and row numbers.
+- "Confirmed by you" means that the table settings were applied with the confirm button. It records a user action; it does not check that the regions are right.
+- Bulk renaming works on the kept columns of one table (spelling, find and replace, prefix, suffix). There are no saved naming presets.
+- Columns are edited one at a time. Rules that link several columns of one row are not detected and not preserved; the only relationships found are single-column key references between tables.
+- The layout, the colours and the behaviour of the reorganised page (2026-11-16) were not seen in a real browser: no browser could be started in the development sandbox.
 
 ## Performance (measured on the development machine, Python 3.12)
 

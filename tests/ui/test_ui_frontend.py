@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 
 import pytest
@@ -69,13 +70,14 @@ def test_script_drives_the_whole_workflow(page):
     _click(ctx, "btn-open")
     assert ctx.eval("__text('msg')") == ""
     assert "XLSX" in ctx.eval("__text('file-facts')") and "1 hidden" in ctx.eval("__text('file-facts')")
-    assert ctx.eval("__count('#regions [data-i]')") == 5 * 8  # five regions, eight editable fields each
+    # Five regions: use, name and kind on each card; five row and column numbers in the technical details.
+    assert ctx.eval("__count('#region-cards [data-i]')") == 5 * 3 and ctx.eval("__count('#regions [data-i]')") == 5 * 5
     assert ctx.eval("document.getElementById('s-regions').hidden") is False
     # Profiling without a policy is refused on the page itself.
     _click(ctx, "btn-profile")
     assert "Choose a privacy policy" in ctx.eval("__text('msg')")
     # Rename a region, apply, choose a policy, profile.
-    ctx.eval("document.querySelectorAll('#regions [data-i]').filter((n) => n.dataset.k === 'name')[1].value = 'stock'")
+    ctx.eval("document.querySelectorAll('#region-cards [data-i]').filter((n) => n.dataset.k === 'name')[1].value = 'stock'")
     _click(ctx, "btn-recipe")
     assert ctx.eval("__text('msg')") == ""
     ctx.eval("document.getElementById('policies').walk([]).filter((n) => n.name === 'policy')[0].checked = true")
@@ -131,13 +133,13 @@ def test_unapplied_form_changes_are_never_used_silently(page):
     assert ctx.eval("__text('msg')") == "" and _hidden(ctx, "s-result") is False
     assert "Done: synthetic.csv was generated" in ctx.eval("__text('result')")
     # A changed generation setting withdraws the result that no longer matches it.
-    ctx.eval("__fire('s-generate', 'input')")
+    ctx.eval("__fire('gen-settings', 'input')")
     assert _hidden(ctx, "s-result") is True and ctx.eval("__text('result')") == ""
     assert "withdrawn" in ctx.eval("__text('msg')")
     _click(ctx, "btn-generate")
     assert _hidden(ctx, "s-result") is False
     # An edited contract form blocks generation until it is applied.
-    ctx.eval("__fire('s-contract', 'change')")
+    ctx.eval("__fire('contract', 'change')")
     assert _hidden(ctx, "s-result") is True and "Unapplied changes" in ctx.eval("__text('contract-state')")
     _click(ctx, "btn-generate")
     assert "unapplied changes" in ctx.eval("__text('msg')") and _hidden(ctx, "s-result") is True
@@ -158,4 +160,87 @@ def test_unapplied_form_changes_are_never_used_silently(page):
     assert ctx.eval("__text('msg')") == "" and _hidden(ctx, "s-generate") is False
     # A changed policy withdraws the profile made under the previous one.
     ctx.eval("__fire('policies', 'change')")
-    assert _hidden(ctx, "s-generate") is True and "profile the file again" in ctx.eval("__text('msg')")
+    assert _hidden(ctx, "s-generate") is True and "analyse the file again" in ctx.eval("__text('msg')")
+
+
+def test_first_screen_summary_layout_and_column_workspace(page, truths):
+    ctx = page
+    ctx.eval(f"document.getElementById('path').value = {json.dumps(product_path('orders_multi.tsv'))}")
+    _click(ctx, "btn-open")
+    assert ctx.eval("__text('msg')") == ""
+    glance = ctx.eval("__text('glance')")
+    # The summary states counts from the detection and says that nothing is confirmed or analysed yet.
+    assert "4 region(s) found: 2 read as table(s), 2 read as note(s)" in glance
+    assert "You have not confirmed any region yet" in glance and "have not been analysed yet" in glance
+    assert "detected automatically" in ctx.eval("__text('region-cards')")
+    # The layout of the first table is shown as cell kinds only.
+    layout = ctx.eval("__text('layout')")
+    assert "Layout of table_1" in layout and "header" in layout and "number" in layout and "date" in layout
+    assert "values of your file are not sent to this page" in layout
+    # Pressing the confirm button is what turns detections into confirmed regions; nothing is left out by it.
+    _click(ctx, "btn-recipe")
+    glance = ctx.eval("__text('glance')")
+    assert "4 of 4 region(s) were confirmed or set by you" in glance and "left out" not in glance
+    assert "confirmed by you" in ctx.eval("__text('region-cards')")
+    ctx.eval("document.getElementById('policies').walk([]).filter((n) => n.name === 'policy')[0].checked = true")
+    _click(ctx, "btn-profile")
+    assert ctx.eval("__text('msg')") == ""
+    glance = ctx.eval("__text('glance')")
+    assert "Table table_1: 1200 rows, 7 columns" in glance and "kind(s) of exception were found" in glance
+    assert "1 key reference(s) between tables" in glance
+    assert "Rules that link several columns of one row are not detected and not preserved" in glance
+    # The grid shows the columns of the selected table with synthetic sample rows; one column panel is open.
+    sheet = ctx.eval("__text('sheet')")
+    assert "order_no" in sheet and "amount_eur" in sheet and "synthetic examples" in sheet
+    assert ctx.eval("__count('#sheet [data-c]')") == 0  # the grid holds no form control of its own
+    assert ctx.eval("Object.values(state.panels).filter((p) => !p.hidden).length") == 1
+    ctx.eval("selectColumn('table_1', 'c4')")
+    assert ctx.eval("state.panels['table_1\\u0000c4'].hidden") is False
+    assert "Column quantity of table_1" in ctx.eval("state.panels['table_1\\u0000c4'].textContent")
+    # Bulk renaming only fills the name fields in; it must be applied like any other edit.
+    ctx.eval("document.getElementById('bulk-style').value = 'upper'; document.getElementById('bulk-prefix').value = 'x_'")
+    _click(ctx, "btn-bulk")
+    assert "7 output name(s) of table_1 were filled in" in ctx.eval("__text('msg')")
+    sheet = ctx.eval("__text('sheet')")
+    assert "x_ORDER_NO" in sheet and "Press \"Apply decisions\" to see sample rows" in sheet
+    assert "Unapplied changes" in ctx.eval("__text('contract-state')")
+    _click(ctx, "btn-generate")
+    assert "unapplied changes" in ctx.eval("__text('msg')") and _hidden(ctx, "s-result") is True
+    # One column renamed by hand on top of the bulk change, then applied.
+    ctx.eval("state.fields['table_1\\u0000c4'].name.value = 'qty'")
+    _click(ctx, "btn-contract")
+    assert ctx.eval("__text('msg')") == ""
+    sheet = ctx.eval("__text('sheet')")
+    assert "qty" in sheet and "x_AMOUNT_EUR" in sheet and "synthetic examples" in sheet
+    ctx.eval("document.getElementById('rows').value = '25'; document.getElementById('seed').value = '2';"
+             "document.getElementById('packing').value = 'auto'")
+    _click(ctx, "btn-generate")
+    assert ctx.eval("__text('msg')") == ""
+    result = ctx.eval("__text('result')")
+    assert "Done: synthetic.tsv was generated" in result and "Download synthetic.tsv" in result
+    assert "x_ORDER_NO" in result and "qty" in result  # the output preview carries the applied names
+    everything = " ".join(ctx.eval(f"__text('{i}')") for i in ("glance", "layout", "sheet", "contract", "report", "result"))
+    for canary in truths["orders_multi.tsv"]["canaries"] + ["ORD-000001", "livraison", "Ventoux"]:
+        assert canary not in everything
+
+
+def test_every_element_the_script_looks_up_exists_in_the_page():
+    # The test DOM creates elements on demand, so a misspelt id would pass there and fail in a browser.
+    with open(os.path.join(STATIC, "app.js"), encoding="utf-8") as fh:
+        script = fh.read()
+    with open(os.path.join(STATIC, "index.html"), encoding="utf-8") as fh:
+        html = fh.read()
+    declared = re.findall(r'\bid="([\w-]+)"', html)
+    assert len(declared) == len(set(declared))
+    looked_up = set(re.findall(r'\$\("([\w-]+)"\)', script)) | set(re.findall(r'(?:show|flag|onEdit)\("([\w-]+)"', script))
+    looked_up |= set(re.findall(r'"(s-[\w-]+)"', script))
+    created_by_the_script = {"save-dir"}
+    assert looked_up - created_by_the_script <= set(declared), sorted(looked_up - set(declared))
+    assert set(re.findall(r'\bfor="([\w-]+)"', html)) <= set(declared)
+    assert set(re.findall(r'href="#([\w-]+)"', html)) <= set(declared)
+    # Every class the script assigns has a rule, or is one of the two purely descriptive ones.
+    with open(os.path.join(STATIC, "app.css"), encoding="utf-8") as fh:
+        css = fh.read()
+    for cls in ("card", "sel", "low", "out", "panel", "tab", "colbtn", "dropped", "rowhead", "sheet", "corner", "btn", "k-text",
+                "k-number", "k-date", "k-bool", "k-missing", "k-empty", "k-error", "link", "bulk", "big", "cards", "preview"):
+        assert "." + cls in css, cls
