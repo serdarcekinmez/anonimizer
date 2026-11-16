@@ -90,3 +90,21 @@ def test_guard_commit_blocks_when_the_scan_finds_something(tmp_path):
         subprocess.run(cmd, cwd=repo, check=True, env=env, capture_output=True)
     code, message = guard_commit.decide({"tool_name": "Bash", "tool_input": {"command": "git commit -m data"}}, str(repo))
     assert code == 2 and "data file outside the fixture directories" in message
+
+
+def test_project_settings_are_fail_closed_and_point_at_existing_hooks():
+    with open(os.path.join(ROOT, ".claude", "settings.json"), encoding="utf-8") as fh:
+        s = json.load(fh)
+    sb = s["sandbox"]
+    assert sb["enabled"] is True and sb["failIfUnavailable"] is True and sb["allowUnsandboxedCommands"] is False
+    assert "/mnt" in sb["filesystem"]["denyRead"] and "~/projects" in sb["filesystem"]["denyRead"]
+    assert sb["filesystem"]["allowRead"] == ["."]
+    perms = s["permissions"]
+    assert perms["disableBypassPermissionsMode"] == "disable" and "allow" not in perms
+    assert {"Read(//mnt/**)", "Edit(//mnt/**)", "Write(//mnt/**)"} <= set(perms["deny"])
+    assert s["env"]["CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH"] == "1"
+    commands = [h["command"] for entry in s["hooks"]["PreToolUse"] for h in entry["hooks"]]
+    for name in ("guard_paths.py", "guard_commit.py"):
+        assert any(name in c for c in commands)
+        assert os.access(os.path.join(HOOKS, name), os.X_OK)
+    assert all("${CLAUDE_PROJECT_DIR}" in c for c in commands)
