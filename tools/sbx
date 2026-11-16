@@ -1,36 +1,53 @@
 #!/usr/bin/env bash
-# Run a command inside a bubblewrap sandbox. Fail closed: never falls back to
-# unsandboxed execution.
-#   - filesystem read-only except the repository
-#   - home directory, /mnt, /root, /run hidden (empty tmpfs)
-#   - no network unless SBX_NET=1 (loopback always available)
+# Run a command isolated from the rest of the machine. Fail closed: never runs a command
+# without isolation.
+#
+# Mode 1, own sandbox (bubblewrap): filesystem read-only except the repository; home
+#   directory, /mnt, /root, /run hidden; no network unless SBX_NET=1 (loopback always works).
+# Mode 2, already confined: bubblewrap cannot nest inside another sandbox. When this script
+#   runs inside one (for example Claude Code's session sandbox) it runs the command directly.
+#   Network, read and write rules are then those of the outer sandbox.
+# Otherwise it refuses (exit 97).
 set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-if ! command -v bwrap >/dev/null 2>&1; then
-  echo "sbx: bubblewrap is not installed; refusing to run unsandboxed" >&2
-  exit 97
-fi
-net=(--unshare-net)
-extra=()
-if [ "${SBX_NET:-0}" = "1" ]; then
-  net=(--share-net)
-  # WSL2 keeps resolv.conf under /mnt/wsl; expose that single file only.
-  resolv="$(readlink -f /etc/resolv.conf || true)"
-  if [ -n "$resolv" ] && [ -f "$resolv" ]; then extra+=(--ro-bind "$resolv" "$resolv"); fi
-fi
 mkdir -p "$ROOT/.tools/home" "$ROOT/.tools/tmp"
-exec bwrap --die-with-parent --unshare-all "${net[@]}" \
-  --ro-bind / / \
-  --tmpfs /home --tmpfs /mnt --tmpfs /root --tmpfs /run --tmpfs /tmp \
-  --proc /proc --dev /dev \
-  "${extra[@]}" \
-  --bind "$ROOT" "$ROOT" \
-  --setenv HOME "$ROOT/.tools/home" \
-  --setenv TMPDIR "$ROOT/.tools/tmp" \
-  --setenv UV_CACHE_DIR "$ROOT/.tools/uv-cache" \
-  --setenv UV_PYTHON_INSTALL_DIR "$ROOT/.tools/python" \
-  --setenv PATH "$ROOT/.venv/bin:$ROOT/.tools/bin:/usr/local/bin:/usr/bin:/bin" \
-  --setenv PYTHONDONTWRITEBYTECODE 1 \
-  --setenv ANONIMIZER_SBX 1 \
-  --chdir "$PWD" \
-  "$@"
+common_env=(
+  HOME="$ROOT/.tools/home" TMPDIR="$ROOT/.tools/tmp" UV_CACHE_DIR="$ROOT/.tools/uv-cache"
+  UV_PYTHON_INSTALL_DIR="$ROOT/.tools/python" PYTHONDONTWRITEBYTECODE=1 ANONIMIZER_SBX=1
+  PATH="$ROOT/.venv/bin:$ROOT/.tools/bin:/usr/local/bin:/usr/bin:/bin"
+)
+
+if command -v bwrap >/dev/null 2>&1 && bwrap --unshare-user --ro-bind / / true >/dev/null 2>&1; then
+  net=(--unshare-net)
+  extra=()
+  if [ "${SBX_NET:-0}" = "1" ]; then
+    net=(--share-net)
+    # WSL2 keeps resolv.conf outside /etc; expose that single file only.
+    resolv="$(readlink -f /etc/resolv.conf || true)"
+    if [ -n "$resolv" ] && [ -f "$resolv" ]; then extra+=(--ro-bind "$resolv" "$resolv"); fi
+  fi
+  setenv=()
+  for kv in "${common_env[@]}"; do setenv+=(--setenv "${kv%%=*}" "${kv#*=}"); done
+  exec bwrap --die-with-parent --unshare-all "${net[@]}" \
+    --ro-bind / / \
+    --tmpfs /home --tmpfs /mnt --tmpfs /root --tmpfs /run --tmpfs /tmp \
+    --proc /proc --dev /dev \
+    "${extra[@]}" \
+    --bind "$ROOT" "$ROOT" \
+    "${setenv[@]}" \
+    --chdir "$PWD" \
+    "$@"
+fi
+
+# No namespace can be created here. Accept only an outer sandbox that can be recognised from
+# inside: this process runs in a user namespace and the account's home directory is
+# read-only. (Whether sibling directories are hidden cannot be checked from here; that is the
+# outer sandbox's configuration, see .claude/settings.json.)
+real_home="$(getent passwd "$(id -u)" 2>/dev/null | cut -d: -f6 || true)"
+read -r _inside _outside span < /proc/self/uid_map || span=4294967295
+if [ "${span:-4294967295}" != "4294967295" ] && [ -n "$real_home" ] && [ ! -w "$real_home" ]; then
+  exec env "${common_env[@]}" "$@"
+fi
+
+echo "sbx: no sandbox available (bubblewrap cannot start and no confining outer sandbox was found); refusing to run" >&2
+exit 97

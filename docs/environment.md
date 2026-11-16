@@ -23,24 +23,25 @@ Survey of 2026-11-12, updated 2026-11-16. Machine-specific paths and names are l
 | Condition | Status on 2026-11-16 | How |
 |---|---|---|
 | Sandbox dependencies present | Met | `bubblewrap` and `socat` are installed |
-| Claude Code's own shell sandbox active | **Not active in the build session.** A probe write outside the workspace succeeded and `/mnt` was listable | Project settings now enable it (`.claude/settings.json`); it takes effect in the next session. Verify with the probes below |
-| Project code runs isolated | Met, by another route | Every install, test and tool run of the build went through `tools/sbx` (bubblewrap): read-only filesystem except the repository, home directory and `/mnt` replaced by empty directories, no network unless `SBX_NET=1` |
-| Wrapper fails closed | Met | `tools/sbx` exits with status 97 if bubblewrap is missing; `tools/gate.py` refuses to run outside it |
+| Claude Code's own shell sandbox active | **Active since `.claude/settings.json` was written at the end of the build session.** Before that it was off: a probe write outside the workspace had succeeded and `/mnt` was listable | Observed afterwards in the same session: the home directory is read-only, a shell command that names `/mnt` is refused by the deny rule, network goes through the filtering proxy, and the full gate passes inside it |
+| Project code runs isolated | Met | Outside a session sandbox, `tools/sbx` builds its own bubblewrap sandbox: read-only filesystem except the repository, home directory and `/mnt` replaced by empty directories, no network unless `SBX_NET=1`. The whole build ran this way. Inside the session sandbox bubblewrap cannot nest, so `tools/sbx` checks that it is in a user namespace with a read-only home directory and then runs the command directly |
+| Wrapper fails closed | Met | `tools/sbx` exits with status 97 if neither mode applies; `tools/gate.py` refuses to run outside it |
 | Read tool cannot read `/mnt` or sibling projects | Configured, untested in a live session | `permissions.deny` rules and the `guard_paths` hook (unit-tested against the documented hook input) |
 | No data-like files in the workspace except registered fixtures | Met | `tools/scan_repo.py`, run by the gate |
 | Bypass mode disabled | Configured, untested in a live session | `permissions.disableBypassPermissionsMode` |
 | Real data kept away from the workspace | Met by instruction | Owner rule |
 
-## Probes to run in a new session
+## Checks to run in a new session
 
 ```
-touch ~/.anonimizer_probe && echo "NOT sandboxed" || echo "write outside the workspace denied"
-ls /mnt/c >/dev/null 2>&1 && echo "NOT sandboxed" || echo "/mnt hidden"
-tools/sbx bash -c 'ls /mnt | wc -l; ls ~ | wc -l'      # both 0 inside the wrapper
+tools/sbx python -c "print('wrapper ok')"       # must print; exit status 97 means no isolation was found
+tools/sbx python tools/gate.py --fast
 ```
 
-If the first two print "NOT sandboxed", the session sandbox is not active. Use `tools/sbx` for everything and check `/sandbox` in Claude Code.
+In Claude Code, `/sandbox` shows whether the session sandbox is on. To switch it off, remove the `sandbox` block from `.claude/settings.json`; `tools/sbx` then goes back to its own bubblewrap sandbox.
+
+Not verified: that the `Read` deny rules and the `guard_paths` hook block the Read tool in a live session (the hook is unit-tested against the documented input format only).
 
 ## Consequence of the session sandbox for copies to Windows
 
-With the sandbox on, shell commands cannot write under `/mnt`. Copying the repository to a Windows folder then has to be done from Windows (for example `git pull` in the Windows clone) or by the owner in a plain terminal.
+With the sandbox on, shell commands can neither read nor write under `/mnt`. Copying the repository to a Windows folder then has to be done from Windows (for example `git pull` in the Windows clone) or by the owner in a plain terminal.

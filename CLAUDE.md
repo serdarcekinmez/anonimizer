@@ -6,7 +6,7 @@ Local, offline tool. It reads a CSV or XLSX file, discovers its structure and da
 
 1. **Only synthetic data in this repository and in any session.** Never read, paste or commit real data. Every data file lives under `tests/fixtures/` and is listed in `tests/fixtures/MANIFEST.yaml`.
 2. **Stay in this directory.** Do not read other projects, `/mnt`, or home-directory files outside `~/.claude` configuration.
-3. **Run project code through the sandbox wrapper:** `tools/sbx <command>`. It hides the home directory and `/mnt` and has no network. `SBX_NET=1 tools/sbx ...` is for installing packages only. If the wrapper cannot start, stop; do not run unsandboxed.
+3. **Run project code through the sandbox wrapper:** `tools/sbx <command>`. Outside a session sandbox it builds its own (home directory and `/mnt` hidden, no network; `SBX_NET=1 tools/sbx ...` is for installing packages only). Inside Claude Code's session sandbox it runs the command directly. If it exits with status 97, stop; do not run unsandboxed.
 4. **No network, model or telemetry at runtime.** Only `anonimizer/ui` may open a socket, on 127.0.0.1.
 5. **The generator never sees source data.** `anonimizer/synth.py` imports `patterns` only. Do not add imports there.
 6. **No cell content in messages.** Errors, logs, reports and test output name rules, counts and positions, never values.

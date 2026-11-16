@@ -2,7 +2,7 @@
   "mode": "full",
   "passed": true,
   "date": "2026-11-16",
-  "commit": "e8bfe7a",
+  "commit": "f55151f",
   "uncommitted_changes": true,
   "python": "3.12.16",
   "sandboxed": true,
@@ -26,7 +26,7 @@
       "exit": 0,
       "seconds": 0.2,
       "tail": [
-        "scan_repo: 135 file(s) scanned, 0 finding(s)"
+        "scan_repo: 153 file(s) scanned, 0 finding(s)"
       ]
     },
     {
@@ -42,14 +42,14 @@
       "step": "tests",
       "command": "-m pytest -q -p no:cacheprovider -rN tests",
       "exit": 0,
-      "seconds": 31.0,
+      "seconds": 32.0,
       "tail": [
         "......s................................................................. [ 24%]",
         "........................................................................ [ 48%]",
         "........................................................................ [ 72%]",
         "........................................................................ [ 97%]",
         "........                                                                 [100%]",
-        "295 passed, 1 skipped in 31.64s"
+        "295 passed, 1 skipped in 32.47s"
       ]
     }
   ],

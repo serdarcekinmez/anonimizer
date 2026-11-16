@@ -48,8 +48,8 @@ All commands ran inside the bubblewrap wrapper (`tools/sbx`) on 2026-11-16.
 
 | Check | Result |
 |---|---|
-| Test suite, Python 3.12.16 | 294 passed, 1 skipped (the opt-in large-file check) |
-| Test suite, Python 3.10.12 | 294 passed, 1 skipped |
+| Test suite, Python 3.12.16 | 295 passed, 1 skipped (the opt-in large-file check) |
+| Test suite, Python 3.10.12 | 294 passed, 1 skipped (run before the last test, a settings check, was added) |
 | Seeded output identical on 3.10 and 3.12 | Yes (pinned digest test) |
 | Lint (`ruff check src tests tools .claude`) | Clean |
 | Repository scan | 0 findings |
@@ -59,7 +59,7 @@ All commands ran inside the bubblewrap wrapper (`tools/sbx`) on 2026-11-16.
 | Detection against ground truth | 27/27, 20/20 and 25/25 planted classes found with exact counts on the three fixtures |
 | Product-value demonstration | Planted classes present in Anonimizer's output: 26/27, 20/20, 24/25. In the plain mock generator's output: 1, 1, 0. See `docs/evidence/product-value-demo.md` |
 | Large file (`pytest --runslow tests/bench`) | Passed. 2,000,000 rows x 10 columns (186 MB CSV): full run in 74.6 s, peak memory 257 MB; the single text value planted at row 1,950,002 of the numeric column was found; 31/31 scenarios covered; assessment passed |
-| Session sandbox of Claude Code | Not active during the build; see `environment.md` |
+| Session sandbox of Claude Code | Off during the build (project code ran in the `tools/sbx` bubblewrap sandbox); on since the project settings were written at the end. The full gate was re-run inside it: 295 passed, 1 skipped |
 | Push to GitHub | See the delivery report of the build session; this environment has no GitHub credentials |
 
 Tests by area: readers and classifier, recipes and regions, profiler, contract, generator and planner, golden parser fixtures (19 files), ground truth (3 fixtures), generated-data checks, canary and leak tests, privacy assessment (negative and positive), determinism, offline operation, architecture rules, properties (hypothesis), command line, interface server and script, gate tools, hooks.
@@ -76,7 +76,7 @@ Not run: any reviewer agent; any real-browser test; mutation testing; the tools 
 2. **Independent review.** Run `/anon-review` and `/anon-cnil release` (or the planned external review). Treat the fixtures' agreement with the detector as the weakest evidence in the repository.
 3. **Try it on files the project did not write** (still synthetic or public): the detection limits in `known-limitations.md` are the ones known so far.
 4. **Browser pass of the interface**, then a browser-driven test.
-5. **Verify the session sandbox and hooks** in a new Claude Code session with the probes in `environment.md`.
+5. **Verify the Read-tool deny rules and the hooks** in a new Claude Code session (`environment.md`).
 6. **Attack-based evaluation** on synthetic source populations, as a development dependency after a licence check. Only then reconsider `RELEASE_TIER_CAP`.
 7. **Header and name review** as an explicit contract decision (F-004).
 8. **Detection depth:** composite keys, value-based numeric outliers, cross-column rules as optional scenarios, located duplicate rows, footers.
