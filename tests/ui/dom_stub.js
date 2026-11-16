@@ -66,3 +66,4 @@ globalThis.fetch = (path, init) => {
 globalThis.__click = (id) => { const n = document.getElementById(id); return Promise.all((n.listeners.click || []).map((f) => f())); };
 globalThis.__text = (id) => document.getElementById(id).textContent;
 globalThis.__count = (sel) => document.querySelectorAll(sel).length;
+globalThis.__fire = (id, ev) => { (document.getElementById(id).listeners[ev] || []).forEach((f) => f({ target: null })); };

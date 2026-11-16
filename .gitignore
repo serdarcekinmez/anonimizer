@@ -69,3 +69,6 @@ docs/compliance/cnil/snapshot/
 /.claude/routines
 /.claude/scheduled_tasks.json
 /.claude/workflows
+
+# machine-specific Windows launcher (names the local WSL distribution and path)
+Start-Anonimizer.cmd

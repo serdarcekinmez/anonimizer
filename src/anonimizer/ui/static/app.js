@@ -71,12 +71,52 @@ async function busy(button, label, fn) {
 
 function show(id, on) { $(id).hidden = !on; }
 function hideFrom(ids) { ids.forEach((id) => show(id, false)); }
+
+// ---- unapplied changes -----------------------------------------------------------------------
+// The server only knows what was applied. An edited form that was not applied must never be
+// taken for the configuration in force: the affected later steps are withdrawn until Apply.
+const dirty = { recipe: false, contract: false };
+function flag(id, text) {
+  const n = $(id);
+  n.textContent = text || "";
+  n.className = text ? "pill warn" : "hint";
+}
+function dropResult(why) {
+  const had = !$("s-result").hidden;
+  show("s-result", false);
+  $("result").replaceChildren();
+  if (had && why) say(why + " The previous result and its download links were withdrawn.", "info");
+}
+function recipeEdited() {
+  dirty.recipe = true;
+  flag("recipe-state", "Unapplied changes: click 'Apply corrections', then profile again.");
+  dropResult("");
+  hideFrom(["s-report", "s-contract", "s-generate"]);
+}
+function policyEdited() {
+  if ($("s-report").hidden && $("s-contract").hidden) return;
+  dropResult("");
+  hideFrom(["s-report", "s-contract", "s-generate"]);
+  say("The privacy policy changed: profile the file again.", "info");
+}
+function contractEdited() {
+  dirty.contract = true;
+  flag("contract-state", "Unapplied changes: click 'Apply decisions' before generating.");
+  dropResult("The contract form changed.");
+}
+function settingsEdited() { dropResult("The generation settings changed: generate again."); }
+function onEdit(id, fn) { ["input", "change"].forEach((ev) => $(id).addEventListener(ev, fn)); }
+
 const pill = (text, kind) => el("span", { class: "pill " + (kind || ""), text });
 const statusKind = (s) => (s === "passed" ? "ok" : s === "failed" ? "bad" : "warn");
 
 // ---- step 1 and 2: file and regions ------------------------------------------------------
 function renderInspect(data) {
   state.inspect = data;
+  dirty.recipe = false;
+  dirty.contract = false;
+  flag("recipe-state", "");
+  dropResult("");
   const f = data.file;
   const facts = [];
   facts.push(data.file_name + " — " + f.format.toUpperCase());
@@ -202,6 +242,9 @@ function renderContract(contract) {
       table(["Generate", "Pin", "Priority", "Column", "Scenario", "Count in source", "Note"], sc, { scroll: true })));
   });
   const r = contract.review;
+  dirty.contract = false;
+  dropResult("");
+  flag("contract-state", "");
   $("contract-state").textContent = r.confirmed ? "Confirmed by " + r.confirmed_by + " on " + r.confirmed_at + "." : "Not confirmed yet: output will be LOCAL_ONLY.";
   const rf = $("rows-for");
   rf.replaceChildren();
@@ -238,6 +281,11 @@ function renderResult(r) {
   box.replaceChildren();
   const a = r.assessment;
   const restricted = a.release_tier === "RESTRICTED";
+  const rowsMade = r.coverage.tables.reduce((n, c) => n + c.generated_data_rows, 0);
+  box.append(el("div", { class: "banner done" },
+    el("strong", { text: "Done: " + r.dataset_file + " was generated (" + rowsMade + " data rows, release tier " + a.release_tier + ")." }),
+    el("div", {}, el("a", { class: "download", href: "/api/download/" + encodeURIComponent(r.dataset_file), text: "Download " + r.dataset_file }),
+      "  ·  The other bundle files and 'save to a folder' are under Export at the end of this section.")));
   box.append(el("div", { class: "banner " + (restricted ? "restricted" : "local") },
     el("strong", { text: "Release tier: " + a.release_tier }),
     el("div", { text: restricted ? "May be shared only inside the organisation that controls the source data, under its own rules. Not assessed as anonymous."
@@ -318,21 +366,29 @@ async function init() {
     renderInspect(await api("/api/recipe", { reset: true }));
   }));
   $("btn-profile").addEventListener("click", () => busy($("btn-profile"), "Profiling every cell…", async () => {
+    if (dirty.recipe) throw new Error("The table and parsing settings were changed but not applied. Click 'Apply corrections' (or 'Back to automatic detection') first.");
     const chosen = document.querySelector("input[name=policy]:checked");
     if (!chosen) throw new Error("Choose a privacy policy first.");
     const data = await api("/api/profile", { policy: chosen.value });
     renderReport(data.report);
     renderContract(data.contract);
-    show("s-result", false);
+    dropResult("");
   }));
   $("btn-contract").addEventListener("click", () => busy($("btn-contract"), "Applying…", async () => {
     renderContract((await api("/api/contract", collectDecisions())).contract);
   }));
   $("btn-generate").addEventListener("click", () => busy($("btn-generate"), "Generating and assessing…", async () => {
+    if (dirty.recipe) throw new Error("The table and parsing settings were changed but not applied. Apply them and profile again before generating.");
+    if (dirty.contract) throw new Error("The contract form has unapplied changes. Click 'Apply decisions' first; nothing was generated.");
+    dropResult("");
     const rowsFor = {};
     document.querySelectorAll("#rows-for [data-table]").forEach((i) => { if (i.value !== "") rowsFor[i.dataset.table] = Number(i.value); });
     renderResult(await api("/api/generate", { rows: Number($("rows").value), rows_for: rowsFor, seed: $("seed").value, packing: $("packing").value }));
   }));
+  onEdit("s-regions", recipeEdited);
+  onEdit("policies", policyEdited);
+  onEdit("s-contract", contractEdited);
+  onEdit("s-generate", settingsEdited);
 }
 
 init().catch((e) => say(e.message, "err"));

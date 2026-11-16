@@ -157,6 +157,7 @@ class Session:
     def generate(self, body: dict) -> dict:
         if self.contract is None:
             raise ApiError(409, "profile the file first")
+        self.result = None  # links of an earlier run stop working as soon as a new run is requested
         rows: dict = {"*": body.get("rows")}
         for name, n in (body.get("rows_for") or {}).items():
             if n not in (None, ""):

@@ -36,6 +36,8 @@ td.n, th.n { text-align:right; }
 .banner.local { background:#fdf6e7; border-color:#ecd3a4; }
 .banner.restricted { background:#eef4fb; border-color:#bcd0ea; }
 .banner strong { font-size:15px; }
+.banner.done { background:#eef8f1; border-color:#b9dcc6; }
+a.download { font-weight:600; }
 #msg { position:sticky; top:0; z-index:5; }
 #msg div { padding:9px 28px; }
 #msg .err { background:#fcefef; color:var(--bad); border-bottom:1px solid #e7b9be; }

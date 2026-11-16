@@ -113,3 +113,49 @@ def test_errors_are_shown_not_swallowed(page):
     _click(ctx, "btn-open")
     assert "not an existing file" in ctx.eval("__text('msg')")
     assert ctx.eval("document.getElementById('msg').children[0].className") == "err"
+
+
+def _hidden(ctx, node_id):
+    return ctx.eval(f"document.getElementById({json.dumps(node_id)}).hidden")
+
+
+def test_unapplied_form_changes_are_never_used_silently(page):
+    ctx = page
+    ctx.eval(f"document.getElementById('path').value = {json.dumps(product_path('customers_hidden.csv'))}")
+    _click(ctx, "btn-open")
+    ctx.eval("document.getElementById('policies').walk([]).filter((n) => n.name === 'policy')[0].checked = true")
+    _click(ctx, "btn-profile")
+    ctx.eval("document.getElementById('rows').value = '20'; document.getElementById('seed').value = '1';"
+             "document.getElementById('packing').value = 'auto'")
+    _click(ctx, "btn-generate")
+    assert ctx.eval("__text('msg')") == "" and _hidden(ctx, "s-result") is False
+    assert "Done: synthetic.csv was generated" in ctx.eval("__text('result')")
+    # A changed generation setting withdraws the result that no longer matches it.
+    ctx.eval("__fire('s-generate', 'input')")
+    assert _hidden(ctx, "s-result") is True and ctx.eval("__text('result')") == ""
+    assert "withdrawn" in ctx.eval("__text('msg')")
+    _click(ctx, "btn-generate")
+    assert _hidden(ctx, "s-result") is False
+    # An edited contract form blocks generation until it is applied.
+    ctx.eval("__fire('s-contract', 'change')")
+    assert _hidden(ctx, "s-result") is True and "Unapplied changes" in ctx.eval("__text('contract-state')")
+    _click(ctx, "btn-generate")
+    assert "unapplied changes" in ctx.eval("__text('msg')") and _hidden(ctx, "s-result") is True
+    _click(ctx, "btn-contract")
+    assert "Unapplied changes" not in ctx.eval("__text('contract-state')")
+    _click(ctx, "btn-generate")
+    assert ctx.eval("__text('msg')") == "" and _hidden(ctx, "s-result") is False
+    # Edited table settings withdraw every later step and block profiling until applied.
+    ctx.eval("__fire('s-regions', 'input')")
+    for section in ("s-report", "s-contract", "s-generate", "s-result"):
+        assert _hidden(ctx, section) is True
+    assert "Unapplied changes" in ctx.eval("__text('recipe-state')")
+    _click(ctx, "btn-profile")
+    assert "not applied" in ctx.eval("__text('msg')") and _hidden(ctx, "s-contract") is True
+    _click(ctx, "btn-recipe")
+    assert ctx.eval("__text('recipe-state')") == ""
+    _click(ctx, "btn-profile")
+    assert ctx.eval("__text('msg')") == "" and _hidden(ctx, "s-generate") is False
+    # A changed policy withdraws the profile made under the previous one.
+    ctx.eval("__fire('policies', 'change')")
+    assert _hidden(ctx, "s-generate") is True and "profile the file again" in ctx.eval("__text('msg')")
