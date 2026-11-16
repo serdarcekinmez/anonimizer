@@ -63,6 +63,14 @@ anonimizer ui
 
 Open the address it prints. The page walks through file, tables, policy, report, contract, generation, result and export.
 
+On Windows with the project inside WSL, a double-click launcher can be generated for the machine:
+
+```
+python3 tools/launch_wsl.py --write-launcher     # writes Start-Anonimizer.cmd (not tracked: it names the local distribution and path)
+```
+
+The launcher starts the interface through `tools/sbx` and allows one instance at a time. A second start shows the address of the running instance. If that instance's session file is missing, the launcher waits ten seconds, checks that the lock holder really is an Anonimizer launcher of this checkout, and asks before stopping it and starting a new one; it never deletes a held lock and never stops a process it cannot identify. After an update of the code, close the running instance and start it again.
+
 More options: `anonimizer generate --help`. Exit status: 0 success, 2 input error, 3 full coverage required and not reached, 4 release tier refused.
 
 ## Verify it yourself

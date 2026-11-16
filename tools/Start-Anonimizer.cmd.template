@@ -1,0 +1,30 @@
+@echo off
+rem Anonimizer launcher for Windows. It starts the existing installation inside WSL and installs nothing.
+rem This file is generated: python3 tools/launch_wsl.py --write-launcher fills in the distribution and the path.
+rem
+rem It does not depend on the folder it is started from. When it is double-clicked inside \\wsl.localhost\...,
+rem cmd.exe cannot use that network folder as its working directory, says so, and falls back to the Windows
+rem folder before this script runs. That is harmless here: the script moves to a local folder itself and
+rem clears the message. Copying this file to the desktop avoids the message altogether.
+cd /d "%SystemRoot%" >nul 2>&1
+cls
+title Anonimizer - WSL
+set "ARGS=--no-prompt %*"
+:run
+echo Starting Anonimizer in WSL (@DISTRO@)...
+"%SystemRoot%\System32\wsl.exe" --distribution "@DISTRO@" --cd "@ROOT@" --exec /usr/bin/python3 tools/launch_wsl.py %ARGS%
+set "CODE=%ERRORLEVEL%"
+echo.
+if "%CODE%"=="3" goto ask
+if "%CODE%"=="0" goto done
+echo Anonimizer did not start, code %CODE%. The lines above say why and what to do. Nothing was installed.
+goto done
+:ask
+choice /c YN /n /m "Stop that instance and start a new one now? The file open in it and any unsaved result are lost. [Y/N] "
+if errorlevel 2 goto leave
+set "ARGS=--restart %*"
+goto run
+:leave
+echo Left running. Nothing was changed.
+:done
+pause
