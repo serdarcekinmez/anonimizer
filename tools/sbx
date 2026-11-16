@@ -1,0 +1,35 @@
+#!/usr/bin/env bash
+# Run a command inside a bubblewrap sandbox. Fail closed: never falls back to
+# unsandboxed execution.
+#   - filesystem read-only except the repository
+#   - home directory, /mnt, /root, /run hidden (empty tmpfs)
+#   - no network unless SBX_NET=1 (loopback always available)
+set -euo pipefail
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+if ! command -v bwrap >/dev/null 2>&1; then
+  echo "sbx: bubblewrap is not installed; refusing to run unsandboxed" >&2
+  exit 97
+fi
+net=(--unshare-net)
+extra=()
+if [ "${SBX_NET:-0}" = "1" ]; then
+  net=(--share-net)
+  # WSL2 keeps resolv.conf under /mnt/wsl; expose that single file only.
+  resolv="$(readlink -f /etc/resolv.conf || true)"
+  if [ -n "$resolv" ] && [ -f "$resolv" ]; then extra+=(--ro-bind "$resolv" "$resolv"); fi
+fi
+mkdir -p "$ROOT/.tools/home" "$ROOT/.tools/tmp"
+exec bwrap --die-with-parent --unshare-all "${net[@]}" \
+  --ro-bind / / \
+  --tmpfs /home --tmpfs /mnt --tmpfs /root --tmpfs /run --tmpfs /tmp \
+  --proc /proc --dev /dev \
+  "${extra[@]}" \
+  --bind "$ROOT" "$ROOT" \
+  --setenv HOME "$ROOT/.tools/home" \
+  --setenv TMPDIR "$ROOT/.tools/tmp" \
+  --setenv UV_CACHE_DIR "$ROOT/.tools/uv-cache" \
+  --setenv UV_PYTHON_INSTALL_DIR "$ROOT/.tools/python" \
+  --setenv PATH "$ROOT/.venv/bin:$ROOT/.tools/bin:/usr/local/bin:/usr/bin:/bin" \
+  --setenv PYTHONDONTWRITEBYTECODE 1 \
+  --chdir "$PWD" \
+  "$@"

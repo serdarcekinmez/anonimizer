@@ -1,0 +1,331 @@
+{
+  "fixture": "customers_hidden.csv",
+  "tables": [
+    {
+      "name": "table_1",
+      "rows": 5000,
+      "columns": 10,
+      "header_row": 1
+    }
+  ],
+  "relationships": [],
+  "canaries": [
+    "Xqzvanta Wolfhaven77",
+    "Wolfhaven77",
+    "CANARY-NOTE-7731 call back",
+    "CANARY-NOTE-7731",
+    "pending review"
+  ],
+  "anomalies": [
+    {
+      "table": "table_1",
+      "column": null,
+      "class": "row.duplicate",
+      "count": 2,
+      "rows": [
+        4861,
+        3362
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": null,
+      "class": "row.ragged_long",
+      "count": 1,
+      "rows": [
+        2986
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": null,
+      "class": "row.ragged_short",
+      "count": 1,
+      "rows": [
+        3365
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "balance",
+      "class": "format.number_deviation",
+      "count": 1,
+      "rows": [
+        2349
+      ],
+      "notes": [
+        "decimal comma"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "balance",
+      "class": "missing.empty",
+      "count": 2,
+      "rows": [
+        3729,
+        261
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "balance",
+      "class": "missing.marker",
+      "count": 4,
+      "rows": [
+        4751,
+        4100,
+        2558,
+        4115
+      ],
+      "notes": [
+        "N/A",
+        "-"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "balance",
+      "class": "numeric.negative",
+      "count": 2,
+      "rows": [
+        4952,
+        3988
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "balance",
+      "class": "numeric.zero",
+      "count": 4,
+      "rows": [
+        3259,
+        2396,
+        4933,
+        768
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "balance",
+      "class": "type.text_in_number",
+      "count": 1,
+      "rows": [
+        4877
+      ],
+      "notes": [
+        "single text value deep in the file"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "country",
+      "class": "category.rare_value",
+      "count": 1,
+      "rows": [],
+      "notes": [
+        "one category occurs once"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "country",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        4784
+      ],
+      "notes": [
+        "UNKNOWN"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "country",
+      "class": "text.rare_pattern",
+      "count": 1,
+      "rows": [
+        2006
+      ],
+      "notes": [
+        "lower-case code"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "customer_id",
+      "class": "key.duplicate",
+      "count": 3,
+      "rows": [
+        4958,
+        4861,
+        3362
+      ],
+      "notes": [
+        "from a duplicate row"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "email",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        1904
+      ],
+      "notes": [
+        "null"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "email",
+      "class": "text.padded",
+      "count": 1,
+      "rows": [
+        2442
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "full_name",
+      "class": "text.rare_pattern",
+      "count": 1,
+      "rows": [
+        1559
+      ],
+      "notes": [
+        "canary"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "loyalty_points",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        1850
+      ],
+      "notes": [
+        "NaN"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "loyalty_points",
+      "class": "missing.whitespace",
+      "count": 1,
+      "rows": [
+        87
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "loyalty_points",
+      "class": "type.text_in_number",
+      "count": 1,
+      "rows": [
+        3696
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "notes",
+      "class": "missing.empty",
+      "count": 4520,
+      "rows": [],
+      "notes": [
+        "most rows have no note"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "notes",
+      "class": "missing.quoted_empty",
+      "count": 2,
+      "rows": [
+        4420,
+        1580
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "notes",
+      "class": "text.formula_like",
+      "count": 1,
+      "rows": [
+        901
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "notes",
+      "class": "text.multiline",
+      "count": 1,
+      "rows": [
+        1445
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "notes",
+      "class": "text.rare_pattern",
+      "count": 3,
+      "rows": [
+        1445,
+        901,
+        3702
+      ],
+      "notes": [
+        "canary"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "signup_date",
+      "class": "format.date_deviation",
+      "count": 3,
+      "rows": [
+        2473,
+        2571,
+        2507
+      ],
+      "notes": [
+        "DD/MM/YYYY"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "signup_date",
+      "class": "missing.empty",
+      "count": 1,
+      "rows": [
+        4859
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "signup_date",
+      "class": "value.invalid_date",
+      "count": 2,
+      "rows": [
+        2520,
+        3262
+      ],
+      "notes": []
+    }
+  ]
+}
