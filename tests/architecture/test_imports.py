@@ -13,7 +13,7 @@ NETWORK_MODULES = {"socket", "ssl", "http", "urllib", "ftplib", "smtplib", "popl
 AI_MODULES = {"anthropic", "openai", "transformers", "torch", "langchain", "ollama", "mistralai", "cohere"}
 # Layer order: a module may import only from layers listed before it.
 LAYERS = ["grid", "patterns", "policy", "regions", "recipe", "profile", "contract", "synth", "privacy", "export",
-          "reports", "pipeline", "cli", "ui"]
+          "reports", "pipeline", "inspector", "cli", "ui"]
 ALLOWED = {
     "grid": set(), "patterns": {"grid"}, "policy": set(), "regions": {"grid", "patterns"},
     "recipe": {"grid", "regions"}, "profile": {"grid", "patterns", "policy", "recipe", "regions"},
@@ -22,7 +22,9 @@ ALLOWED = {
     "reports": {"contract", "profile"},
     "pipeline": {"contract", "export", "policy", "privacy", "profile", "recipe", "reports", "synth"},
     "cli": {"contract", "export", "grid", "policy", "recipe", "synth", "pipeline", "reports", "privacy", "ui"},
-    "ui": {"contract", "export", "grid", "policy", "recipe", "synth", "pipeline", "reports", "privacy", "profile"},
+    "inspector": {"grid", "patterns", "recipe"},
+    "ui": {"contract", "export", "grid", "policy", "recipe", "synth", "pipeline", "reports", "privacy", "profile",
+           "inspector"},
 }
 
 
@@ -81,6 +83,19 @@ def test_generator_cannot_reach_source_data():
     assert external <= {"__future__", "calendar", "hashlib", "math", "random", "typing"}
     names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
     assert not names & {"open", "exec", "eval", "__import__", "compile"}
+
+
+def test_source_inspector_is_used_by_the_interface_only():
+    """The module that returns original cells feeds the local page and nothing that can leave the machine."""
+    for rel, (top, tree) in MODULES.items():
+        internal, _external = _imports(tree)
+        if top not in ("ui", "inspector"):
+            assert "inspector" not in internal, f"{rel} imports the source inspector"
+    _top, tree = MODULES["inspector.py"]
+    internal, external = _imports(tree)
+    assert internal <= {"grid", "model", "patterns", "recipe"} and external <= {"__future__", "datetime"}
+    names = {n.id for n in ast.walk(tree) if isinstance(n, ast.Name)}
+    assert not names & {"open", "exec", "eval", "__import__", "compile", "print"}
 
 
 def test_no_network_or_model_library_outside_the_ui():

@@ -148,7 +148,7 @@ def test_unapplied_form_changes_are_never_used_silently(page):
     _click(ctx, "btn-generate")
     assert ctx.eval("__text('msg')") == "" and _hidden(ctx, "s-result") is False
     # Edited table settings withdraw every later step and block profiling until applied.
-    ctx.eval("__fire('s-regions', 'input')")
+    ctx.eval("__fire('region-cards', 'input')")
     for section in ("s-report", "s-contract", "s-generate", "s-result"):
         assert _hidden(ctx, section) is True
     assert "Unapplied changes" in ctx.eval("__text('recipe-state')")
@@ -173,10 +173,31 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     assert "4 region(s) found: 2 read as table(s), 2 read as note(s)" in glance
     assert "You have not confirmed any region yet" in glance and "have not been analysed yet" in glance
     assert "detected automatically" in ctx.eval("__text('region-cards')")
-    # The layout of the first table is shown as cell kinds only.
-    layout = ctx.eval("__text('layout')")
-    assert "Layout of table_1" in layout and "header" in layout and "number" in layout and "date" in layout
-    assert "values of your file are not sent to this page" in layout
+    # The source inspector opens on the first table: its real header and cells, with the rows above it.
+    source = ctx.eval("__text('source')")
+    assert "order_no" in source and "ORD-000001" in source and "4 · header" in source and "5 · data" in source
+    assert "selected region table_1: rows 4–1205, columns 1–7, header in row 4" in ctx.eval("__text('source-pos')")
+    assert ctx.eval("document.getElementById('src-prev').disabled") is True
+    # Paging is bounded: fifty rows at a time, and "go to row" reaches a value planted deep in the file.
+    _click(ctx, "src-next")
+    assert "rows 51–100" in ctx.eval("__text('source-pos')") and "ORD-000001" not in ctx.eval("__text('source')")
+    ctx.eval("document.getElementById('src-goto').value = '230'")
+    _click(ctx, "src-go")
+    assert "rows 230–279" in ctx.eval("__text('source-pos')") and "douze" in ctx.eval("__text('source')")
+    # A note region shows its text; the other regions stay visible around it.
+    ctx.eval("selectRegion(0)")
+    _run(ctx)
+    assert "1 · note" in ctx.eval("__text('source')") and "Your file: note_1" in ctx.eval("__text('source-title')")
+    # Column settings do not exist before the analysis, and the page says so instead of failing.
+    ctx.eval("selectRegion(1)")
+    _run(ctx)
+    ctx.eval("openColumn(state.src.regions.find((r) => r.index === 1), 4)")
+    assert "open after the analysis" in ctx.eval("__text('msg')")
+    # Exact counts need no policy.
+    _click(ctx, "btn-stats")
+    stats = ctx.eval("__text('stats')")
+    assert ctx.eval("__text('msg')") == "" and "Exact counts of table_1: 1200 data rows, 7 columns" in stats
+    assert "web ×" in stats and _hidden(ctx, "s-contract") is True
     # Pressing the confirm button is what turns detections into confirmed regions; nothing is left out by it.
     _click(ctx, "btn-recipe")
     glance = ctx.eval("__text('glance')")
@@ -191,7 +212,11 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     assert "Rules that link several columns of one row are not detected and not preserved" in glance
     # The grid shows the columns of the selected table with synthetic sample rows; one column panel is open.
     sheet = ctx.eval("__text('sheet')")
-    assert "order_no" in sheet and "amount_eur" in sheet and "synthetic examples" in sheet
+    assert "order_no" in sheet and "amount_eur" in sheet and "examples of ordinary values" in sheet
+    assert "your file, row 5" in sheet and "ORD-000001" in sheet and "synthetic 1" in sheet
+    # From the source view, a column heading of the selected table opens that column's settings.
+    ctx.eval("openColumn(state.src.regions.find((r) => r.index === 1), 5)")
+    assert ctx.eval("state.column") == "c5" and ctx.eval("state.panels['table_1\\u0000c5'].hidden") is False
     assert ctx.eval("__count('#sheet [data-c]')") == 0  # the grid holds no form control of its own
     assert ctx.eval("Object.values(state.panels).filter((p) => !p.hidden).length") == 1
     ctx.eval("selectColumn('table_1', 'c4')")
@@ -202,7 +227,7 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     _click(ctx, "btn-bulk")
     assert "7 output name(s) of table_1 were filled in" in ctx.eval("__text('msg')")
     sheet = ctx.eval("__text('sheet')")
-    assert "x_ORDER_NO" in sheet and "Press \"Apply decisions\" to see sample rows" in sheet
+    assert "x_ORDER_NO" in sheet and "Press \"Apply decisions\" to see synthetic rows" in sheet
     assert "Unapplied changes" in ctx.eval("__text('contract-state')")
     _click(ctx, "btn-generate")
     assert "unapplied changes" in ctx.eval("__text('msg')") and _hidden(ctx, "s-result") is True
@@ -211,7 +236,7 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     _click(ctx, "btn-contract")
     assert ctx.eval("__text('msg')") == ""
     sheet = ctx.eval("__text('sheet')")
-    assert "qty" in sheet and "x_AMOUNT_EUR" in sheet and "synthetic examples" in sheet
+    assert "qty" in sheet and "x_AMOUNT_EUR" in sheet and "synthetic 1" in sheet and "null" not in sheet
     ctx.eval("document.getElementById('rows').value = '25'; document.getElementById('seed').value = '2';"
              "document.getElementById('packing').value = 'auto'")
     _click(ctx, "btn-generate")
@@ -219,9 +244,12 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     result = ctx.eval("__text('result')")
     assert "Done: synthetic.tsv was generated" in result and "Download synthetic.tsv" in result
     assert "x_ORDER_NO" in result and "qty" in result  # the output preview carries the applied names
-    everything = " ".join(ctx.eval(f"__text('{i}')") for i in ("glance", "layout", "sheet", "contract", "report", "result"))
+    # The source is shown next to the output for comparison, in its own block; the result itself, the
+    # summary, the settings and the report hold nothing of the source.
+    assert "ORD-000001" in ctx.eval("__text('compare')") and "Your file: first 40 rows" in ctx.eval("__text('compare')")
+    generated_side = " ".join(ctx.eval(f"__text('{i}')") for i in ("glance", "contract", "report", "result"))
     for canary in truths["orders_multi.tsv"]["canaries"] + ["ORD-000001", "livraison", "Ventoux"]:
-        assert canary not in everything
+        assert canary not in generated_side
 
 
 def test_every_element_the_script_looks_up_exists_in_the_page():
@@ -238,9 +266,11 @@ def test_every_element_the_script_looks_up_exists_in_the_page():
     assert looked_up - created_by_the_script <= set(declared), sorted(looked_up - set(declared))
     assert set(re.findall(r'\bfor="([\w-]+)"', html)) <= set(declared)
     assert set(re.findall(r'href="#([\w-]+)"', html)) <= set(declared)
-    # Every class the script assigns has a rule, or is one of the two purely descriptive ones.
+    # Every class the script assigns has a rule in the stylesheet.
     with open(os.path.join(STATIC, "app.css"), encoding="utf-8") as fh:
         css = fh.read()
-    for cls in ("card", "sel", "low", "out", "panel", "tab", "colbtn", "dropped", "rowhead", "sheet", "corner", "btn", "k-text",
-                "k-number", "k-date", "k-bool", "k-missing", "k-empty", "k-error", "link", "bulk", "big", "cards", "preview"):
+    for cls in ("card", "sel", "low", "out", "panel", "tab", "colbtn", "dropped", "rowhead", "sheet", "corner", "btn", "link",
+                "bulk", "big", "cards", "preview", "src", "in", "hdr", "oth", "absent", "srcrow", "synrow", "legend"):
         assert "." + cls in css, cls
+    # Nothing but the page's own functions may put text on the page: a null handed to the DOM shows as "null".
+    assert not re.search(r"replaceChildren\([^)]*\?[^)]*: null\)", script)

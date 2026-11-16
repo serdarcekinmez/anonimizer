@@ -3,12 +3,20 @@
 // is inserted as text (never as HTML), so file contents cannot inject markup.
 
 const $ = (id) => document.getElementById(id);
+const API = 3;  // must equal API_REVISION of the server that delivered this page
+const PAGE_ROWS = 50;   // rows of the source shown at a time
+const PAGE_COLS = 30;
+const SOURCE_ROWS = 5;  // original rows shown above the synthetic sample in step 4
 const state = {
   meta: null, inspect: null, report: null, contract: null,
   region: null, cards: [],            // step 2: selected region and its card nodes
   table: null, column: null,          // step 4: selected table name and column id ("" = whole rows)
   fields: {}, panels: {},             // step 4: form controls and panels by "table\u0000column"
   sample: null, sampleStale: false,   // synthetic sample rows of the applied contract
+  sampleWhy: "",                      // why no sample is available, in the server's words
+  src: null,                          // source inspector: the rectangle of original cells on screen
+  srcRows: {},                        // first original data rows per table, for the grid of step 4
+  stats: null,                        // exact local counts, once asked for
 };
 
 function el(tag, attrs, ...children) {
@@ -99,6 +107,7 @@ function dropResult(why) {
   const had = !$("s-result").hidden;
   show("s-result", false);
   $("result").replaceChildren();
+  $("compare").replaceChildren();
   if (had && why) say(why + " The previous result and its download links were withdrawn.", "info");
 }
 function recipeEdited() {
@@ -107,7 +116,6 @@ function recipeEdited() {
   dropResult("");
   hideFrom(["s-report", "s-contract", "s-generate"]);
   state.report = null;
-  $("layout").replaceChildren(el("p", { class: "hint", text: "The table settings changed. Apply them to see the layout again." }));
   renderGlance();
 }
 function policyEdited() {
@@ -194,6 +202,8 @@ function renderInspect(data) {
   dirty.contract = false;
   flag("recipe-state", "");
   dropResult("");
+  state.stats = null;  // counts belong to one applied set of table settings
+  $("stats").replaceChildren();
   $("file-facts").textContent = fileFacts(data).join(" · ");
   const regions = data.recipe.tables;
   state.cards = regions.map((t, i) => {
@@ -210,7 +220,7 @@ function renderInspect(data) {
         ["table", "note"].map((k) => el("option", { value: k, selected: t.kind === k, text: k === "table" ? "table" : "note (text outside a table)" }))),
       el("div", { class: "hint", text: where }),
       low && (t.notes || []).length ? el("div", { class: "low", text: t.notes.join("; ") }) : null,
-      el("button", { class: "link", text: "Show the layout of this region", onclick: () => selectRegion(i) }));
+      el("button", { class: "link", text: "Show this region in the file", onclick: () => selectRegion(i) }));
   });
   $("region-cards").replaceChildren(...state.cards);
   const rows = regions.map((t, i) => {
@@ -229,37 +239,105 @@ function renderInspect(data) {
   if (regions.length) selectRegion(first < 0 ? 0 : first);
 }
 
-async function selectRegion(i) {
+function selectRegion(i) {
   state.region = i;
   const regions = state.inspect.recipe.tables;
   state.cards.forEach((card, j) => {
     card.className = "card" + (regions[j].confidence < LOW ? " low" : "") + (regions[j].include ? "" : " out") + (j === i ? " sel" : "");
   });
-  const box = $("layout");
-  if (dirty.recipe) {
-    box.replaceChildren(el("p", { class: "hint", text: "The table settings changed. Apply them to see the layout again." }));
-    return;
-  }
+  return loadSource({ region: i });
+}
+
+// ---- source inspector: the original cells of the user's own file --------------------------------
+// What is loaded here stays in this page. It is never sent back to the server and never becomes part
+// of the contract, a report or an export.
+async function loadSource(request) {
   try {
-    const lay = await api("/api/layout", { index: i });
-    if (state.region === i && !dirty.recipe) drawLayout(lay, regions[i]);
+    state.src = await api("/api/source", Object.assign({ rows: PAGE_ROWS, cols: PAGE_COLS }, request));
+    drawSource();
   } catch (e) {
-    box.replaceChildren(el("p", { class: "hint", text: "The layout of this region could not be shown: " + e.message }));
+    state.src = null;
+    $("source-pos").textContent = "";
+    $("source").replaceChildren(el("p", { class: "low", text: "The file could not be shown: " + e.message }));
   }
 }
 
-const ROLE = { header: "header", intro: "text before the table", data: "data" };
-function drawLayout(lay, region) {
-  const head = el("tr", {}, el("th", { text: "Row" }), Array.from({ length: lay.columns }, (_, j) => el("th", { text: "col " + (lay.first_col + j) })));
-  const body = lay.rows.map((r) => el("tr", {},
-    el("td", { class: "rowhead", text: r.row + " · " + (region.kind === "table" ? ROLE[r.role] : "note") }),
-    r.kinds.map((k) => el("td", { class: "k k-" + k, text: k }))));
-  $("layout").replaceChildren(
-    el("h3", { text: "Layout of " + region.name + ": first " + lay.rows.length + " of " + lay.rows_total + " rows"
-      + (lay.columns < lay.columns_total ? ", first " + lay.columns + " of " + lay.columns_total + " columns" : "") }),
-    el("p", { class: "hint", text: "Only the kind of each cell is shown (text, number, date, missing). The values of your file are not sent to this page. "
-      + "If the header or the first data row is in the wrong place, correct it in the technical details below." }),
-    el("div", { class: "scroll" }, el("table", {}, el("thead", {}, head), el("tbody", {}, body))));
+function moveSource(change) {
+  const d = state.src;
+  if (d) loadSource(Object.assign({ sheet: d.sheet, row: d.first_row, col: d.first_col }, change(d)));
+}
+
+const within = (r, row, col) => row >= r.first_row && row <= r.last_row && col >= r.first_col && col <= r.last_col;
+
+function drawSource() {
+  const d = state.src;
+  const sel = d.regions.find((r) => r.index === state.region) || null;
+  const cols = Array.from({ length: d.columns }, (_, j) => d.first_col + j);
+  const head = el("tr", {}, el("th", { text: "Row" }), cols.map((c) => {
+    const mine = sel && sel.kind === "table" && c >= sel.first_col && c <= sel.last_col;
+    return el("th", { class: mine ? "in" : null }, mine
+      ? el("button", { class: "link", title: "Open the settings of this column", text: "col " + c + " · settings", onclick: () => openColumn(sel, c) })
+      : "col " + c);
+  }));
+  const body = d.rows.map((r) => {
+    const role = !sel || r.row < sel.first_row || r.row > sel.last_row ? ""
+      : sel.kind !== "table" ? "note" : r.row === sel.header_row ? "header" : r.row < sel.first_data_row ? "before the table" : "data";
+    return el("tr", {}, el("td", { class: "rowhead", text: r.row + (role ? " · " + role : "") + (r.hidden ? " · hidden row" : "") }),
+      r.cells.map((v, j) => {
+        const c = cols[j];
+        const cls = v === null ? "absent" : sel && within(sel, r.row, c) ? (r.row === sel.header_row ? "hdr" : "in")
+          : d.regions.some((x) => within(x, r.row, c)) ? "oth" : null;
+        return el("td", { class: cls, text: v === null ? "" : v });
+      }));
+  });
+  const lastRow = d.rows.length ? d.rows[d.rows.length - 1].row : d.first_row;
+  $("source-title").textContent = sel ? "Your file: " + sel.name + " and what surrounds it" : "Your file: sheet " + d.sheet_name;
+  $("source-pos").textContent = "Sheet " + d.sheet_name + " · rows " + d.first_row + "–" + lastRow + (d.more_rows ? "" : " (end of the sheet)")
+    + " · columns " + d.first_col + "–" + (d.first_col + Math.max(d.columns, 1) - 1) + " of " + d.columns_total
+    + (sel ? " · selected region " + sel.name + ": rows " + sel.first_row + "–" + sel.last_row + ", columns " + sel.first_col + "–" + sel.last_col
+      + (sel.header_row ? ", header in row " + sel.header_row : "") : "")
+    + (d.truncated_cells ? " · " + d.truncated_cells + " long cell(s) are cut for display" : "");
+  $("source").replaceChildren(
+    el("p", { class: "legend" }, el("span", { class: "in", text: "selected region" }), el("span", { class: "oth", text: "another region" }),
+      el("span", { class: "ctx", text: "outside every region" })),
+    d.rows.length ? el("div", { class: "scroll" }, el("table", { class: "src" }, el("thead", {}, head), el("tbody", {}, body)))
+      : el("p", { class: "hint", text: "There is no row " + d.first_row + ": the sheet ends before it." }));
+  $("src-sheet").replaceChildren(...d.sheets.map((x) => el("option", { value: String(x.index), selected: x.index === d.sheet,
+    text: x.name + (x.state && x.state !== "visible" ? " (" + x.state + ")" : "") })));
+  $("src-prev").disabled = d.first_row <= 1;
+  $("src-next").disabled = !d.more_rows;
+  $("src-left").disabled = d.first_col <= 1;
+  $("src-right").disabled = d.first_col + d.columns - 1 >= d.columns_total;
+  $("src-region").disabled = state.region === null;
+}
+
+// A column heading of the selected table leads to that column's settings, once they exist.
+function openColumn(region, col) {
+  const t = state.contract && !$("s-contract").hidden ? state.contract.tables.find((x) => x.name === region.name) : null;
+  const id = "c" + (col - region.first_col + 1);
+  if (t && state.panels[key(t.name, id)]) {
+    selectColumn(t.name, id);
+    $("s-contract").scrollIntoView({ behavior: "smooth" });
+    say("");
+  } else {
+    say("The settings of this column open after the analysis: choose a privacy policy in step 3 and analyse the file.", "info");
+  }
+}
+
+function drawStats() {
+  const box = $("stats");
+  box.replaceChildren();
+  if (!state.stats) return;
+  const kv = (o) => Object.entries(o).map(([k, v]) => k + " ×" + v).join(", ");
+  state.stats.tables.forEach((t) => {
+    box.append(el("h3", { text: "Exact counts of " + t.name + ": " + t.rows + " data rows, " + t.columns_total + " columns"
+      + (t.duplicate_extra_rows ? ", " + t.duplicate_extra_rows + " repeated row(s)" : "") + (t.hidden_rows ? ", " + t.hidden_rows + " hidden row(s)" : "") }));
+    box.append(table(["Column", "Type found", "Cells", "With a value", "Missing", "Kinds of missing", "Missing markers", "Kinds of value", "Distinct values", "Most frequent values"],
+      t.columns.map((c) => [c.name, c.type, c.cells, c.values, c.missing, kv(c.missing_kinds), kv(c.markers), kv(c.kinds), c.distinct,
+        c.frequent_values.map(([v, n]) => v + " ×" + n).join(", ")]), { scroll: true }));
+  });
+  if (!state.stats.tables.length) box.append(el("p", { class: "hint", text: "No region is in use as a table, so there is nothing to count." }));
+  box.append(el("p", { class: "hint", text: "Most frequent values are listed only for columns with few distinct values. These counts stay on this machine; what reports and exports contain is decided by the privacy policy of step 3." }));
 }
 
 function collectRecipe() {
@@ -435,26 +513,47 @@ function drawSheet() {
       el("span", { class: "nm", text: f.name.value || "(no name)" }), el("small", { text: notes.join(" · ") })));
   }));
   const sample = !state.sampleStale && state.sample ? state.sample[t.name] : null;
-  const body = (sample ? sample.rows : []).map((row, i) => el("tr", {}, el("td", { class: "rowhead", text: String(i + 1) }),
+  const original = state.srcRows[t.name] || [];
+  const body = original.map((r) => el("tr", { class: "srcrow" }, el("td", { class: "rowhead", text: "your file, row " + r.row }),
+    t.columns.map((c) => {
+      const v = r.cells[Number(c.id.slice(1)) - 1];
+      return el("td", { class: "cell", text: v === null || v === undefined ? "" : v });
+    })));
+  (sample ? sample.rows : []).forEach((row, i) => body.push(el("tr", { class: "synrow" }, el("td", { class: "rowhead", text: "synthetic " + (i + 1) }),
     t.columns.map((c) => {
       const j = sample.columns.indexOf(c.id);
       return el("td", { class: "cell", text: j < 0 ? "" : row[j] });
-    })));
-  const note = state.sampleStale ? "The column settings changed. Press \"Apply decisions\" to see sample rows for the new settings."
-    : sample ? "The rows above are synthetic examples of ordinary values, produced from the applied settings. They are not rows of your file; exceptions are listed per column."
-      : "No sample rows are available for this table.";
+    }))));
+  const notes = [];
+  if (original.length) notes.push("Rows marked \"your file\" are original rows, shown for comparison on this machine only.");
+  if (state.sampleStale) notes.push("The column settings changed. Press \"Apply decisions\" to see synthetic rows for the new settings.");
+  else if (sample) notes.push("Rows marked \"synthetic\" are examples of ordinary values produced from the applied settings; exceptions are listed per column.");
+  else notes.push("No synthetic sample rows are available for this table" + (state.sampleWhy ? ": " + state.sampleWhy : "."));
   const rowPanel = state.panels[key(t.name, "")];
-  $("sheet").replaceChildren(
+  const parts = [
     el("div", { class: "scroll" }, el("table", { class: "sheet" }, el("thead", {}, head), el("tbody", {}, body))),
-    el("p", { class: "hint", text: note }),
-    rowPanel ? el("button", { class: "tab" + (state.column === "" ? " sel" : ""), text: "Scenarios that concern whole rows", onclick: () => selectColumn(t.name, "") }) : null);
+    el("p", { class: "hint", text: notes.join(" ") })];
+  if (rowPanel) parts.push(el("button", { class: "tab" + (state.column === "" ? " sel" : ""), text: "Scenarios that concern whole rows", onclick: () => selectColumn(t.name, "") }));
+  $("sheet").replaceChildren(...parts);
 }
 
 async function loadSample() {
+  state.sampleWhy = "";
   try {
     state.sample = (await api("/api/sample", {})).tables;
   } catch (e) {
     state.sample = null;
+    state.sampleWhy = e.message;
+  }
+  state.srcRows = {};
+  const regions = state.inspect.recipe.tables;
+  for (const t of state.contract.tables) {
+    const i = regions.findIndex((r) => r.name === t.name && r.kind === "table");
+    if (i < 0) continue;
+    try {
+      const d = await api("/api/source", { region: i, row: regions[i].first_data_row, col: regions[i].first_col, rows: SOURCE_ROWS, cols: 60 });
+      state.srcRows[t.name] = d.rows.filter((r) => r.row <= regions[i].last_data_row);
+    } catch (e) { /* the grid then shows synthetic rows only */ }
   }
   state.sampleStale = false;
   drawSheet();
@@ -576,10 +675,32 @@ function renderResult(r) {
   $("s-generate").scrollIntoView({ behavior: "smooth" });
 }
 
+// The same area of the source, under the generated preview. Kept apart from the result, which holds
+// only what was generated.
+async function loadCompare(r) {
+  const box = $("compare");
+  box.replaceChildren();
+  const sheets = state.inspect.sheets || [];
+  for (const p of r.preview) {
+    let i = sheets.findIndex((x) => x.name === p.sheet);
+    if (i < 0 && r.preview.length === 1) i = 0;
+    if (i < 0) continue;
+    try {
+      const d = await api("/api/source", { sheet: i, row: 1, col: 1, rows: 40, cols: 30 });
+      const head = Array.from({ length: Math.max(d.columns, 1) }, (_, j) => String(d.first_col + j));
+      box.append(el("h4", { text: "Your file" + (r.preview.length > 1 ? ", sheet " + d.sheet_name : "") + ": first " + d.rows.length + " rows" }));
+      box.append(table(["#"].concat(head), d.rows.map((row) => [String(row.row)].concat(row.cells.map((v) => (v === null ? "" : v)))), { scroll: true, cellClass: "cell" }));
+    } catch (e) {
+      box.append(el("p", { class: "hint", text: "The source could not be shown here: " + e.message }));
+    }
+  }
+}
+
 // ---- wiring ----------------------------------------------------------------------------------
 async function init() {
   const res = await fetch("/api/meta", { credentials: "same-origin" });
   state.meta = await res.json();
+  if (state.meta.api !== API) throw new Error("This page and the running application come from different versions. Close the application window and start it again.");
   $("statement").textContent = state.meta.statement;
   $("version").textContent = "Anonimizer " + state.meta.version;
 
@@ -623,9 +744,28 @@ async function init() {
     dropResult("");
     const rowsFor = {};
     document.querySelectorAll("#rows-for [data-table]").forEach((i) => { if (i.value !== "") rowsFor[i.dataset.table] = Number(i.value); });
-    renderResult(await api("/api/generate", { rows: Number($("rows").value), rows_for: rowsFor, seed: $("seed").value, packing: $("packing").value }));
+    const result = await api("/api/generate", { rows: Number($("rows").value), rows_for: rowsFor, seed: $("seed").value, packing: $("packing").value });
+    renderResult(result);
+    await loadCompare(result);
   }));
-  onEdit("s-regions", recipeEdited);
+  $("btn-stats").addEventListener("click", () => busy($("btn-stats"), "Counting every cell…", async () => {
+    state.stats = await api("/api/source/stats", {});
+    drawStats();
+  }));
+  $("src-region").addEventListener("click", () => { if (state.region !== null) selectRegion(state.region); });
+  $("src-top").addEventListener("click", () => moveSource(() => ({ row: 1, col: 1 })));
+  $("src-prev").addEventListener("click", () => moveSource((d) => ({ row: Math.max(1, d.first_row - PAGE_ROWS) })));
+  $("src-next").addEventListener("click", () => moveSource((d) => ({ row: d.first_row + PAGE_ROWS })));
+  $("src-left").addEventListener("click", () => moveSource((d) => ({ col: Math.max(1, d.first_col - PAGE_COLS) })));
+  $("src-right").addEventListener("click", () => moveSource((d) => ({ col: d.first_col + PAGE_COLS })));
+  $("src-go").addEventListener("click", () => {
+    const row = Math.floor(Number($("src-goto").value));
+    if (!(row >= 1)) { say("Type a row number of 1 or more.", "err"); return; }
+    moveSource(() => ({ row }));
+  });
+  $("src-sheet").addEventListener("change", () => loadSource({ sheet: Number($("src-sheet").value), row: 1, col: 1 }));
+  onEdit("region-cards", recipeEdited);
+  onEdit("regions-tech", recipeEdited);
   onEdit("policies", policyEdited);
   onEdit("contract", contractEdited);
   onEdit("approved-by", contractEdited);

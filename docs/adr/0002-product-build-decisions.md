@@ -30,6 +30,8 @@ The owner asked for a working Mode B product in one session and authorised ordin
 | 18 | Type checker | pyright was not set up | Time. ruff and the test suite are the static and dynamic checks | Phase 0 step 4 |
 | 19 | CNIL source record | The page was fetched once on 2026-11-16 to record its normalised hash and section titles; the text is not stored | F2 | Phase 0 step 10 |
 | 20 | Development MCP servers, agent teams | None used | As approved | A1 |
+| 21 | Source inspector in the local interface | `inspector.py` returns original cells and exact counts to the local page through two routes; imported by the interface only; no policy needed to look | Owner's requirement of 2026-11-16: the authorised user must be able to inspect their own file. It ends the earlier property that no answer of the local server carries a source value; the property now holds for every route except the two inspector routes | Phase 5 |
+| 22 | Page and routes delivered together | The page files are read once when the server starts, and the page checks an API revision number | A server left running across an update served a newer page than its routes, which showed as "not found" in the page | Phase 5 |
 
 ## Not done from Phase 0
 

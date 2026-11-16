@@ -30,6 +30,7 @@ Local, offline tool. It reads a CSV or XLSX file, discovers its structure and da
 | `privacy.py` | Deterministic assessment per criterion, tier derivation |
 | `export.py` | Writers and export gate; the only writer of datasets |
 | `reports.py`, `pipeline.py`, `cli.py`, `ui/` | Reports, orchestration, interfaces |
+| `inspector.py` | Local source inspector: original cells and exact counts for the local page. Imported by `ui` only; never by anything that feeds the contract, the generator, a report or an export |
 
 `tests/architecture/test_imports.py` enforces the layering, the generator's isolation, the absence of network libraries and where files may be written.
 

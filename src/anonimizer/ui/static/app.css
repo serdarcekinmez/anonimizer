@@ -98,3 +98,16 @@ table.sheet th.corner { padding:4px 7px; }
 .bulk { background:var(--mbg); border-radius:6px; padding:8px 10px; }
 button.big { padding:9px 18px; font-size:15px; font-weight:600; }
 a.btn { display:inline-block; padding:8px 16px; margin:6px 8px 2px 0; border-radius:6px; background:var(--m, var(--accent)); color:#fff; text-decoration:none; font-weight:600; }
+
+/* Source inspector: original cells. The selected region is tinted, its header row is bold, the rest is context. */
+table.src td { font-family:ui-monospace, Menlo, Consolas, monospace; white-space:pre; max-width:280px; overflow:hidden; text-overflow:ellipsis; color:var(--muted); }
+table.src td.in { background:var(--mbg, #eef4fb); color:var(--ink); }
+table.src td.hdr { background:var(--mbg, #eef4fb); color:var(--ink); font-weight:700; border-bottom:2px solid var(--m, var(--accent)); }
+table.src td.oth { background:#f3f4f6; color:var(--ink); }
+table.src td.absent { background:repeating-linear-gradient(135deg, #fafafa, #fafafa 6px, #f0f1f3 6px, #f0f1f3 12px); }
+table.src th.in { background:var(--m, var(--accent)); color:#fff; }
+table.src th button.link { color:#fff; font-weight:600; }
+tr.srcrow td { background:#eef1f5; }
+tr.srcrow td.rowhead, tr.synrow td.rowhead { font-weight:600; white-space:nowrap; }
+.legend span { display:inline-block; padding:1px 8px; margin-right:6px; border:1px solid var(--line); border-radius:4px; font-size:12px; }
+.legend .in { background:var(--mbg); } .legend .oth { background:#f3f4f6; } .legend .ctx { color:var(--muted); }

@@ -41,7 +41,27 @@
     <h2><span class="step">2</span> Check the tables found in your file</h2>
     <p class="hint">Each card is a region the tool detected. A detection is a proposal: it becomes "confirmed by you" only when you press the confirm button below. Untick "Use" to leave a region out.</p>
     <div id="region-cards" class="cards"></div>
-    <div id="layout" class="preview"></div>
+    <div id="source-box" class="preview">
+      <h3 id="source-title">Your file</h3>
+      <p class="hint">These are the original cells of your file, read on this machine for this page only. They are not written to any report, manifest or export. No privacy policy is needed to look at them.</p>
+      <div class="row">
+        <label for="src-sheet">Sheet</label><select id="src-sheet" class="short"></select>
+        <button id="src-region">Show the selected region</button>
+        <button id="src-top">Top of the sheet</button>
+        <button id="src-prev">Previous rows</button>
+        <button id="src-next">Next rows</button>
+        <label for="src-goto">Go to row</label><input id="src-goto" type="number" min="1" class="short"><button id="src-go">Go</button>
+        <button id="src-left">Columns to the left</button>
+        <button id="src-right">Columns to the right</button>
+      </div>
+      <div id="source-pos" class="facts"></div>
+      <div id="source"></div>
+      <div class="row">
+        <button id="btn-stats">Count exactly (reads the whole file)</button>
+        <span class="hint">Exact counts per column, computed and shown on this machine only.</span>
+      </div>
+      <div id="stats"></div>
+    </div>
     <details id="regions-tech">
       <summary>Technical details: row and column numbers, detection confidence, parsing options</summary>
       <div id="file-facts" class="facts"></div>
@@ -115,6 +135,10 @@
     <div class="row"><button id="btn-generate" class="primary big">Generate synthetic dataset</button><span id="generate-state" class="hint"></span></div>
     <div id="s-result" hidden>
       <div id="result"></div>
+      <details id="compare-box" open>
+        <summary>Compare with your file: the same area of the source (original values, shown locally only)</summary>
+        <div id="compare"></div>
+      </details>
     </div>
   </section>
 </main>

@@ -51,7 +51,11 @@ See [privacy-limitations.md](privacy-limitations.md) and [threat-model.md](threa
 - One user, one file, one session. State lives in memory and in a private temporary folder removed on exit.
 - Checked by server tests and by running the page script in an embedded JavaScript engine. Not yet exercised in a real browser by the developer.
 - No progress bar: analysing a file of several hundred megabytes shows "Analysing every cell" until it is done.
-- The page never receives the values of the source file. The region preview shows the kind of each cell (text, number, date, missing) for the first eight rows; the column grid shows synthetic sample rows of ordinary values produced from the applied contract. Neither is a view of the source rows, so a wrong header or boundary has to be recognised from cell kinds and row numbers.
+- The local page shows the original cells of the opened file (source inspector, owner's requirement of 2026-11-16): a rectangle of at most 200 rows by 60 columns per request, 50 by 30 as shown, cells longer than 300 characters cut for display. Reaching a row far down a large file re-reads the file up to that row each time; there is no index. There is no search or filter.
+- Spreadsheet dates are shown as dates and booleans as TRUE/FALSE; other cells are shown as stored, not as a spreadsheet program would format them. Formulas are not shown, only their cached results.
+- Exact counts come from one full scan, asked for with a button; the same scan is reused by the analysis. They list the most frequent values only for columns with few distinct values, and no minimum, maximum or mean.
+- Region highlights in the source view follow the applied table settings, not numbers typed but not yet applied.
+- The comparison under the generated preview shows the first 40 rows of the same sheet of the source. It is a side-by-side reading aid, not a row-by-row match.
 - "Confirmed by you" means that the table settings were applied with the confirm button. It records a user action; it does not check that the regions are right.
 - Bulk renaming works on the kept columns of one table (spelling, find and replace, prefix, suffix). There are no saved naming presets.
 - Columns are edited one at a time. Rules that link several columns of one row are not detected and not preserved; the only relationships found are single-column key references between tables.

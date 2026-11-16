@@ -10,7 +10,10 @@ import threading
 import pytest
 
 from anonimizer.ui.server import COOKIE, make_server
-from tests.conftest import product_path
+from tests.conftest import product_path, read_bundle_texts
+
+STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                          "src", "anonimizer", "ui", "static")
 
 
 class Client:
@@ -190,7 +193,7 @@ def test_upload_and_internal_errors_hide_details(ui, monkeypatch):
     def boom(*a, **k):
         raise ValueError("bad value 'Wolfhaven77'")
 
-    monkeypatch.setattr(srv, "profile_source", boom)
+    monkeypatch.setattr(srv, "build_profile", boom)
     status, err = c.post("/api/profile", {"policy": "internal-dev"})
     assert status == 500 and "Wolfhaven77" not in err["error"] and "ValueError" in err["error"]
 
@@ -203,35 +206,98 @@ def test_session_folder_is_removed(ui):
     assert not os.path.exists(workdir)
 
 
-def test_layout_and_sample_previews_carry_no_source_value(ui, truths):
+
+SOURCE_ONLY = ["ORD-000001", "livraison", "Ventoux"]
+
+
+def test_source_inspector_shows_original_cells_without_a_policy(ui, truths):
     c, _server, _session = ui
-    status, err = c.post("/api/layout", {"index": 0})
-    assert status == 409  # no file yet
-    status, data = c.post("/api/open", {"path": product_path("orders_multi.tsv")})
+    assert c.post("/api/source", {"region": 0})[0] == 409  # no file yet
+    status, opened = c.post("/api/open", {"path": product_path("orders_multi.tsv")})
     assert status == 200
-    status, err = c.post("/api/sample", {})
-    assert status == 409 and "profile" in err["error"]
-    for bad in (None, -1, 99, "1", True):
-        status, err = c.post("/api/layout", {"index": bad})
-        assert status == 400 and "no such region" in err["error"]
-    blobs = []
-    for i, spec in enumerate(data["recipe"]["tables"]):
-        status, lay = c.post("/api/layout", {"index": i})
-        assert status == 200 and 1 <= len(lay["rows"]) <= 8 and lay["rows"][0]["row"] == spec["first_row"]
-        assert all(len(r["kinds"]) == lay["columns"] for r in lay["rows"])
-        # A layout answer is made of row numbers, roles and cell kinds, and of nothing else.
-        assert {k for r in lay["rows"] for k in r["kinds"]} <= {"text", "number", "date", "bool", "missing", "error", "empty"}
-        assert {r["role"] for r in lay["rows"]} <= {"header", "intro", "data"}
-        blobs.append(json.dumps(lay, ensure_ascii=False))
-    status, lay = c.post("/api/layout", {"index": 1})
-    assert [r["role"] for r in lay["rows"]][:2] == ["header", "data"] and lay["rows"][0]["row"] == 4
-    assert c.post("/api/profile", {"policy": "external-strict"})[0] == 200
-    status, sample = c.post("/api/sample", {})
-    assert status == 200 and set(sample["tables"]) == {"table_1", "table_2"}
-    assert sample["tables"]["table_1"]["columns"][0] == "c1" and 1 <= len(sample["tables"]["table_1"]["rows"]) <= 6
-    blobs.append(json.dumps(sample, ensure_ascii=False))
-    for canary in truths["orders_multi.tsv"]["canaries"] + ["ORD-000001", "livraison", "Ventoux"]:
-        assert all(canary not in blob for blob in blobs)
-    # A new recipe withdraws the contract, and the sample with it.
-    assert c.post("/api/recipe", {"reset": True})[0] == 200
-    assert c.post("/api/sample", {})[0] == 409
+    # The first table with its surroundings: three rows above it, the header, then the data. No policy was chosen.
+    status, win = c.post("/api/source", {"region": 1})
+    assert status == 200 and win["contains_source_values"] is True
+    reg = next(r for r in win["regions"] if r["index"] == 1)
+    assert (reg["header_row"], reg["first_data_row"], reg["first_col"], reg["last_col"]) == (4, 5, 1, 7)
+    assert win["first_row"] == 1 and len(win["rows"]) == 50 and win["more_rows"] is True
+    by_row = {r["row"]: r["cells"] for r in win["rows"]}
+    assert by_row[4][:2] == ["order_no", "customer_ref"] and by_row[5][0] == "ORD-000001"
+    # Paging is bounded whatever is asked for, and positions are checked.
+    status, big = c.post("/api/source", {"sheet": 0, "row": 1, "rows": 100000, "cols": 100000})
+    assert status == 200 and len(big["rows"]) == 200 and big["columns"] <= 60
+    for bad in ({"region": 99}, {"region": "1"}, {"sheet": 5}, {"row": 0}, {"col": -3}, {"rows": 0}, {"row": 1.5}, {"region": True}):
+        status, err = c.post("/api/source", bad)
+        assert status == 400, bad
+        assert "ORD-" not in err["error"]
+    # A value planted deep in the file is reachable by going to its row; the end of the sheet is reported.
+    planted = next(a for a in truths["orders_multi.tsv"]["anomalies"] if a["class"] == "type.text_in_number")
+    deep_row = planted["rows"][0]  # the builder records the row of the file
+    status, deep = c.post("/api/source", {"sheet": 0, "row": deep_row, "rows": 1})
+    assert status == 200 and deep["rows"][0]["row"] == deep_row and "douze" in deep["rows"][0]["cells"]
+    status, end = c.post("/api/source", {"sheet": 0, "row": 1350, "rows": 50})
+    assert status == 200 and end["more_rows"] is False and 1 <= len(end["rows"]) < 50
+    status, past = c.post("/api/source", {"sheet": 0, "row": 900000})
+    assert status == 200 and past["rows"] == [] and past["more_rows"] is False
+    # Exact counts, still without a policy, equal what the fixture builder planted.
+    status, stats = c.post("/api/source/stats", {})
+    assert status == 200
+    table = {t["name"]: t for t in stats["tables"]}["table_1"]
+    cols = {col["name"]: col for col in table["columns"]}
+    assert table["rows"] == 1200 and len(cols) == 7
+    assert cols["quantity"]["kinds"]["text"] == 1 and cols["quantity"]["missing"] == 1
+    assert cols["comment"]["missing"] == 1117 and cols["order_no"]["distinct"] == 1200
+    assert {v for v, _n in cols["channel"]["frequent_values"]} == {"web", "store", "phone"}
+    assert c.post("/api/sample", {})[0] == 409  # counting is not an analysis under a policy: there is no contract
+
+
+def test_what_the_inspector_shows_reaches_no_other_answer_and_no_export(ui, tmp_path, truths):
+    c, _server, session = ui
+    canaries = truths["orders_multi.tsv"]["canaries"] + SOURCE_ONLY
+    answers = {}
+    status, answers["open"] = c.post("/api/open", {"path": product_path("orders_multi.tsv")})
+    # Look at everything first: the whole first table, the notes around it, the exact counts.
+    seen = ""
+    for row in range(1, 1400, 200):
+        status, win = c.post("/api/source", {"sheet": 0, "row": row, "rows": 200})
+        assert status == 200
+        seen += json.dumps(win, ensure_ascii=False)
+    seen += json.dumps(c.post("/api/source/stats", {})[1], ensure_ascii=False)
+    assert all(canary in seen for canary in canaries)  # the inspector really shows the original values
+    status, answers["recipe"] = c.post("/api/recipe", {"recipe": answers["open"]["recipe"]})
+    c.post("/api/source/stats", {})
+    status, answers["profile"] = c.post("/api/profile", {"policy": "internal-dev"})
+    assert status == 200
+    status, answers["sample"] = c.post("/api/sample", {})
+    cols = [{"table": t["name"], "id": col["id"], "keep": True,
+             "sensitivity": "non_sensitive" if col["sensitivity"]["class"] == "unreviewed" else col["sensitivity"]["class"]}
+            for t in answers["profile"]["contract"]["tables"] for col in t["columns"]]
+    status, answers["contract"] = c.post("/api/contract", {"columns": cols, "confirm_by": "UI Tester"})
+    assert status == 200
+    c.post("/api/source", {"region": 1})  # looking again between the steps changes nothing
+    status, answers["generate"] = c.post("/api/generate", {"rows": 40, "seed": "inspect", "packing": "auto"})
+    assert status == 200 and answers["generate"]["assessment"]["assessment_status"] == "passed"
+    # Only the two inspector routes carry original values; every other answer is free of them.
+    for name, answer in answers.items():
+        blob = json.dumps(answer, ensure_ascii=False)
+        for canary in canaries:
+            assert canary not in blob, (name, "an answer outside the inspector carries a source value")
+    # The bundle holds the intended artefacts and nothing of what was looked at.
+    target = str(tmp_path / "bundle")
+    status, saved = c.post("/api/save", {"directory": target})
+    assert status == 200 and sorted(saved["files"]) == sorted(os.listdir(target)) == sorted(answers["generate"]["files"])
+    for name, text in read_bundle_texts(target).items():
+        for canary in canaries:
+            assert canary not in text, name
+    # Nothing was written next to the bundle either: the session folder holds runs and the register only.
+    assert all(n.startswith("run") or n == "release_register.jsonl" for n in os.listdir(session.workdir))
+
+
+def test_page_and_server_are_delivered_together(ui):
+    c, server, _session = ui
+    _resp, meta = c.request("GET", "/api/meta")
+    with open(os.path.join(STATIC_DIR, "app.js"), encoding="utf-8") as fh:
+        script = fh.read()
+    assert f"const API = {json.loads(meta)['api']};" in script
+    # The page is read when the server starts, so a running server never serves a newer page than its routes.
+    assert server.RequestHandlerClass.static["app.js"] == script.encode("utf-8")

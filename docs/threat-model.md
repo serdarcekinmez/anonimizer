@@ -19,6 +19,7 @@ This is the project's own model. It is not derived from a CNIL text beyond the t
 | Anyone else | Not trusted. No tier in this release is meant for them. |
 | Input files | Untrusted. A CSV or workbook may be malformed or hostile. |
 | A browser tab on the same machine | Untrusted for the local interface. |
+| The page of the local interface | Trusted with source values since 2026-11-16: the source inspector sends original cells and exact counts to it, for the person who opened the file. |
 
 ## Assets that leave the engine, and what they can disclose
 
@@ -30,6 +31,19 @@ This is the project's own model. It is not derived from a CNIL text beyond the t
 | Dataset Contract | Pattern classes, rates, generator specifications | Same as the reports |
 | Assessment record | Metrics, policy, statements | Number of coincident values, never the values |
 | Private profile | Source row numbers, exact layouts, category values | Private by design; written only to a directory the user names, mode 0600 |
+
+## Source inspector
+
+The owner required that the person running the tool can look at their own file in the local interface: cells, headers, notes and exact counts, without choosing a policy. Two routes, `/api/source` and `/api/source/stats`, therefore return original values. Before this, no answer of the local server carried a source value.
+
+| Risk | Control | Where it is tested |
+|---|---|---|
+| Original values shown on screen end up in a report, a manifest or the bundle | `anonimizer/inspector.py` is imported by the interface only; its output is returned to the page and stored nowhere on the server. Contract, generator, assessment, reports, export and pipeline cannot import it | `tests/architecture` (inspector rule), `tests/ui` (bundle and every other answer scanned for planted values after the inspector was used) |
+| Another page or program on the machine reads the two routes | Same guards as every route: loopback bind, per-session token in an HttpOnly SameSite=Strict cookie, Host and Origin checks, no CORS header, strict CSP, `Cache-Control: no-store` | `tests/ui` |
+| The values stay behind after the session | The page keeps them in memory only; nothing is written by the inspector. The browser may still hold them while the tab is open | Not tested in a browser |
+| Unbounded read through the interface | At most 200 rows by 60 columns per answer; long cells cut | `tests/ui` |
+
+Not covered: someone looking at the screen, browser extensions with access to the page, screen sharing. A person who must not see the source must not be given the running interface.
 
 ## Attacks considered and the control for each
 

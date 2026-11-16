@@ -24,13 +24,14 @@ import traceback
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlsplit
 
-from .. import NON_CERTIFICATION_STATEMENT, __version__
+from .. import NON_CERTIFICATION_STATEMENT, __version__, inspector
 from .. import contract as contract_mod
 from ..export import ExportRefused
 from ..grid import GridError, open_source
-from ..pipeline import apply_decisions, generate_and_export, inspect, profile_source
+from ..pipeline import apply_decisions, generate_and_export, inspect
 from ..policy import POLICIES, PolicyError, get_policy
-from ..recipe import ParseRecipe, RecipeError, region_layout
+from ..profile import build_profile, to_shareable
+from ..recipe import ParseRecipe, RecipeError
 from ..reports import summarize_profile
 from ..synth import SynthError, generate
 
@@ -38,11 +39,14 @@ STATIC = os.path.join(os.path.dirname(os.path.abspath(__file__)), "static")
 MAX_JSON = 5 * 1024 * 1024
 MAX_UPLOAD = 4 * 1024**3
 COOKIE = "anonimizer_session"
-LAYOUT_ROWS, LAYOUT_COLS, SAMPLE_ROWS = 8, 40, 6
+SAMPLE_ROWS = 6
+# Raised whenever the page and the server stop understanding each other; app.js carries the same number.
+API_REVISION = 3
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
        "form-action 'none'; frame-ancestors 'none'; base-uri 'none'")
-KNOWN_ERRORS = (GridError, RecipeError, contract_mod.ContractError, PolicyError, SynthError, ExportRefused)
+KNOWN_ERRORS = (GridError, RecipeError, contract_mod.ContractError, PolicyError, SynthError, ExportRefused,
+                inspector.InspectError)
 STATIC_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8",
                 ".css": "text/css; charset=utf-8"}
 
@@ -112,13 +116,22 @@ class Session:
         self.private = self.shareable = self.contract = self.result = None
         return self.inspect()
 
-    def layout(self, body: dict) -> dict:
-        """Kinds of the first cells of one region (text, number, date ...), never their values."""
+    def source(self, body: dict) -> dict:
+        """Original cells of the opened file, for the local source inspector. Needs no policy."""
         self._need_file()
-        index = body.get("index")
-        out = region_layout(self.path, self.recipe, index, LAYOUT_ROWS, LAYOUT_COLS)
-        out["index"] = index
-        return out
+        return inspector.window(self.path, self.recipe, region=body.get("region"), sheet=body.get("sheet"),
+                                first_row=body.get("row"), first_col=body.get("col"),
+                                n_rows=body.get("rows"), n_cols=body.get("cols"))
+
+    def source_stats(self, _body: dict) -> dict:
+        """Exact local counts. Reads the whole file once; the scan is reused by the analysis step."""
+        self._need_file()
+        self._scan()
+        return inspector.statistics(self.private)
+
+    def _scan(self) -> None:
+        if self.private is None:
+            self.private = build_profile(self.path, self.recipe)
 
     def sample(self, _body: dict) -> dict:
         """A few synthetic rows per table, generated from the applied contract only. Nothing is exported."""
@@ -143,7 +156,8 @@ class Session:
         self._need_file()
         policy = get_policy(body.get("policy"))
         self.policy_id = policy.id
-        self.private, self.shareable = profile_source(self.path, self.recipe, policy)
+        self._scan()
+        self.shareable = to_shareable(self.private, policy)
         self.contract = contract_mod.build_contract(self.shareable, policy)
         self.result = None
         return {"policy": policy.to_dict(), "report": summarize_profile(self.shareable, "source"),
@@ -345,7 +359,8 @@ class Handler(BaseHTTPRequestHandler):
         try:
             with self.session.lock:
                 if url.path == "/api/meta":
-                    return self._json(200, {"version": __version__, "statement": NON_CERTIFICATION_STATEMENT,
+                    return self._json(200, {"version": __version__, "api": API_REVISION,
+                                            "statement": NON_CERTIFICATION_STATEMENT,
                                             "policies": [p.to_dict() for p in POLICIES.values()],
                                             "sensitivity_classes": list(contract_mod.SENSITIVITY_CLASSES),
                                             "file_name": self.session.display_name})
@@ -368,7 +383,8 @@ class Handler(BaseHTTPRequestHandler):
                 routes = {"/api/open": lambda: s.open_path(body.get("path")), "/api/recipe": lambda: s.set_recipe(body),
                           "/api/profile": lambda: s.profile(body), "/api/contract": lambda: s.decide(body),
                           "/api/generate": lambda: s.generate(body), "/api/save": lambda: s.save_bundle(body),
-                          "/api/layout": lambda: s.layout(body), "/api/sample": lambda: s.sample(body)}
+                          "/api/sample": lambda: s.sample(body), "/api/source": lambda: s.source(body),
+                          "/api/source/stats": lambda: s.source_stats(body)}
                 handler = routes.get(url.path)
                 if handler is None:
                     return self._json(404, {"error": "not found"})
@@ -383,10 +399,9 @@ class Handler(BaseHTTPRequestHandler):
                                              f"{os.path.basename(tb.filename)}:{tb.lineno}"})
 
     def _static(self, name: str):
-        if name not in ("index.html", "app.js", "app.css"):
+        data = self.static.get(name)
+        if data is None:
             return self._json(404, {"error": "not found"})
-        with open(os.path.join(STATIC, name), "rb") as fh:
-            data = fh.read()
         self._headers(200, STATIC_TYPES[os.path.splitext(name)[1]], len(data))
         self.wfile.write(data)
         return None
@@ -435,7 +450,13 @@ class Handler(BaseHTTPRequestHandler):
 def make_server(port: int = 0, quiet: bool = False) -> tuple[ThreadingHTTPServer, str, Session]:
     session = Session()
     token = secrets.token_urlsafe(32)
-    handler = type("BoundHandler", (Handler,), {"session": session, "token": token, "quiet": quiet})
+    # The page is read once, here. A server that keeps running while the files on disk are replaced
+    # goes on serving the page it was started with, so page and routes always belong together.
+    static = {}
+    for name in ("index.html", "app.js", "app.css"):
+        with open(os.path.join(STATIC, name), "rb") as fh:
+            static[name] = fh.read()
+    handler = type("BoundHandler", (Handler,), {"session": session, "token": token, "quiet": quiet, "static": static})
     server = ThreadingHTTPServer(("127.0.0.1", port), handler)  # loopback only, never 0.0.0.0
     server.daemon_threads = True
     return server, token, session
