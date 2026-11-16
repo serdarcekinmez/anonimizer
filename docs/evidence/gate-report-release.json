@@ -1,0 +1,60 @@
+{
+  "mode": "release",
+  "passed": false,
+  "date": "2026-11-16",
+  "commit": "a21bd98",
+  "uncommitted_changes": true,
+  "python": "3.12.16",
+  "sandboxed": true,
+  "tests": {
+    "passed": 294,
+    "skipped": 1
+  },
+  "steps": [
+    {
+      "step": "lint",
+      "command": "-m ruff check src tests tools .claude",
+      "exit": 0,
+      "seconds": 0.1,
+      "tail": [
+        "All checks passed!"
+      ]
+    },
+    {
+      "step": "repository scan",
+      "command": "tools/scan_repo.py",
+      "exit": 0,
+      "seconds": 0.2,
+      "tail": [
+        "scan_repo: 133 file(s) scanned, 0 finding(s)"
+      ]
+    },
+    {
+      "step": "traceability matrix",
+      "command": "tools/check_rtm.py --release",
+      "exit": 1,
+      "seconds": 0.1,
+      "tail": [
+        "check_rtm: release: F-001 (RISK, high) has no disposition",
+        "check_rtm: release: F-002 (EVIDENCE-GAP, high) has no disposition",
+        "check_rtm: release: F-003 (JUDGMENT, high) has no disposition",
+        "check_rtm: rows by status {'implemented': 6, 'partial': 12, 'planned': 3, 'not_applicable': 1}; 3 error(s), 0 warning(s)"
+      ]
+    },
+    {
+      "step": "tests",
+      "command": "-m pytest -q -p no:cacheprovider -rN tests",
+      "exit": 0,
+      "seconds": 31.3,
+      "tail": [
+        "......s................................................................. [ 24%]",
+        "........................................................................ [ 48%]",
+        "........................................................................ [ 73%]",
+        "........................................................................ [ 97%]",
+        ".......                                                                  [100%]",
+        "294 passed, 1 skipped in 32.01s"
+      ]
+    }
+  ],
+  "statement": "A green gate means the listed controls behaved as specified on the listed fixtures. It is not a certification and not proof of legal anonymity."
+}

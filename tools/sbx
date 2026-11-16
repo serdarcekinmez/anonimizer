@@ -31,5 +31,6 @@ exec bwrap --die-with-parent --unshare-all "${net[@]}" \
   --setenv UV_PYTHON_INSTALL_DIR "$ROOT/.tools/python" \
   --setenv PATH "$ROOT/.venv/bin:$ROOT/.tools/bin:/usr/local/bin:/usr/bin:/bin" \
   --setenv PYTHONDONTWRITEBYTECODE 1 \
+  --setenv ANONIMIZER_SBX 1 \
   --chdir "$PWD" \
   "$@"

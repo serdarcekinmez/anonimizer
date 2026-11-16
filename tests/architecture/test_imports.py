@@ -18,7 +18,7 @@ ALLOWED = {
     "grid": set(), "patterns": {"grid"}, "policy": set(), "regions": {"grid", "patterns"},
     "recipe": {"grid", "regions"}, "profile": {"grid", "patterns", "policy", "recipe", "regions"},
     "contract": {"patterns", "policy"}, "synth": {"patterns"},
-    "privacy": {"patterns", "policy", "recipe"}, "export": {"policy", "synth"},
+    "privacy": {"patterns", "policy", "recipe", "synth"}, "export": {"policy", "synth"},
     "reports": {"contract", "profile"},
     "pipeline": {"contract", "export", "policy", "privacy", "profile", "recipe", "reports", "synth"},
     "cli": {"contract", "export", "grid", "policy", "recipe", "synth", "pipeline", "reports", "privacy", "ui"},
@@ -103,7 +103,7 @@ def test_only_declared_third_party_dependency():
 def test_file_writing_is_confined():
     """Writes happen in export (datasets and documents), pipeline/cli (reports the user asked for) and ui."""
     writers = set()
-    for rel, (top, tree) in MODULES.items():
+    for _rel, (top, tree) in MODULES.items():
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
                 f = node.func

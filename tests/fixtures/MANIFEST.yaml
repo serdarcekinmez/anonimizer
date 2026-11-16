@@ -1,0 +1,47 @@
+# Registered synthetic fixtures. Every data file in the repository must be listed here (tools/scan_repo.py).
+# All content is invented by the builder scripts named below.
+fixtures:
+  - path: tests/fixtures/product/customers_hidden.csv
+    builder: tests/fixtures/build_fixtures.py
+  - path: tests/fixtures/product/orders_multi.tsv
+    builder: tests/fixtures/build_fixtures.py
+  - path: tests/fixtures/product/inventory_mixed.xlsx
+    builder: tests/fixtures/build_fixtures.py
+  - path: tests/fixtures/parser/blank_row_inside.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/cp1252_accents.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/delimiter_only_rows.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/empty.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/header_only.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/headerless_numeric.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/mixed_newlines.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/pipe_delimited.txt
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/preamble_header.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/quoted_multiline.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/ragged.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/semicolon_decimal_comma.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/side_by_side.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/single_column.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/stray_bytes_utf8.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/tabs.tsv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/two_tables_blank_sep.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/utf16_bom.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py
+  - path: tests/fixtures/parser/utf8_bom.csv
+    builder: tests/fixtures/parser/build_parser_fixtures.py

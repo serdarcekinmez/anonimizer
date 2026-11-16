@@ -1,35 +1,46 @@
-# Development environment survey
+# Development environment
 
-Phase 0, step 1. Read-only survey taken 2026-11-12, re-checked the same day. Re-run after any environment change. Machine-specific paths and names are left out because this repository is public.
+Survey of 2026-11-12, updated 2026-11-16. Machine-specific paths and names are left out because this repository is public.
 
-## Observed
+## Observed on 2026-11-16
 
 | Item | Value |
 |---|---|
-| OS | Ubuntu 22.04.5 LTS on WSL2, systemd enabled |
-| Workspace | `~/projects/anonimizer`, ext4 inside the distribution (not under `/mnt`) |
-| Claude Code | 2.1.322 |
-| Python | 3.10.12 (system). The project targets 3.12+, to be provided by `uv` |
-| git | 2.34.1 |
-| Present | `rg`, `git`, `python3` |
-| Missing | `bwrap` (bubblewrap), `socat`, `uv`, `ruff`, `pre-commit`, `gh` |
-| sudo | Requires a password; cannot be used non-interactively |
-| Windows drives | Mounted under `/mnt` (9p); WSL interop enabled |
-| `/etc/wsl.conf` | Only `[boot] systemd=true`; automount and interop at defaults |
-| Other projects | Sibling project directories exist in the same home directory. They are out of scope and are not read |
-| Data-like files nearby | Present in a sibling project (contents not opened) |
-| User-level Claude Code settings | Exist; contents not inspected |
+| OS | Ubuntu 22.04 on WSL2 |
+| Workspace | Inside the distribution's own filesystem (not under `/mnt`) |
+| Claude Code | 2.1.325 (VS Code extension) |
+| System Python | 3.10.12 |
+| Project Python | 3.12.16, installed by `uv` into `.tools/` inside the repository (ignored by git) |
+| `bubblewrap` | 0.6.1, installed |
+| `socat` | 1.7.4.1, installed |
+| `uv`, `ruff`, `pytest`, `hypothesis` | Installed into the project environment (`.tools/`, `.venv/`) |
+| `gh` | Not installed |
+| GitHub credentials for git | None in this environment; pushes fail at the credential prompt |
+| Node.js or a headless browser usable from the sandbox | None; the interface script is run by QuickJS in tests |
 
 ## Isolation conditions
 
-| Condition | Status | What is needed |
+| Condition | Status on 2026-11-16 | How |
 |---|---|---|
-| Sandbox available | **Not met** | `bubblewrap` and `socat` are not installed. Owner runs `sudo apt-get install bubblewrap socat` |
-| Sandbox fails closed | Not yet configurable | `sandbox.enabled` and `sandbox.failIfUnavailable` in project settings, after the packages exist |
-| Sandboxed commands cannot read `/mnt` or other home content | Not met | `sandbox.filesystem.denyRead` / `allowRead` in project settings |
-| Read tool cannot read `/mnt` or sibling projects | Not met | `Read` deny rules plus the `guard_paths` hook |
-| No data-like files in the workspace | Met | Workspace holds documentation only |
-| Bypass mode disabled | Not met | `permissions.disableBypassPermissionsMode: "disable"` |
-| Real data kept away from the workspace | Met by instruction | Owner rule: only synthetic data in the workspace; other projects are not accessed |
+| Sandbox dependencies present | Met | `bubblewrap` and `socat` are installed |
+| Claude Code's own shell sandbox active | **Not active in the build session.** A probe write outside the workspace succeeded and `/mnt` was listable | Project settings now enable it (`.claude/settings.json`); it takes effect in the next session. Verify with the probes below |
+| Project code runs isolated | Met, by another route | Every install, test and tool run of the build went through `tools/sbx` (bubblewrap): read-only filesystem except the repository, home directory and `/mnt` replaced by empty directories, no network unless `SBX_NET=1` |
+| Wrapper fails closed | Met | `tools/sbx` exits with status 97 if bubblewrap is missing; `tools/gate.py` refuses to run outside it |
+| Read tool cannot read `/mnt` or sibling projects | Configured, untested in a live session | `permissions.deny` rules and the `guard_paths` hook (unit-tested against the documented hook input) |
+| No data-like files in the workspace except registered fixtures | Met | `tools/scan_repo.py`, run by the gate |
+| Bypass mode disabled | Configured, untested in a live session | `permissions.disableBypassPermissionsMode` |
+| Real data kept away from the workspace | Met by instruction | Owner rule |
 
-Until the first condition is met, shell commands run unsandboxed and the boundary rests on working rules only. Phase 0 steps that install tools or run project code are on hold for that reason (see `phase-0-status.md`).
+## Probes to run in a new session
+
+```
+touch ~/.anonimizer_probe && echo "NOT sandboxed" || echo "write outside the workspace denied"
+ls /mnt/c >/dev/null 2>&1 && echo "NOT sandboxed" || echo "/mnt hidden"
+tools/sbx bash -c 'ls /mnt | wc -l; ls ~ | wc -l'      # both 0 inside the wrapper
+```
+
+If the first two print "NOT sandboxed", the session sandbox is not active. Use `tools/sbx` for everything and check `/sandbox` in Claude Code.
+
+## Consequence of the session sandbox for copies to Windows
+
+With the sandbox on, shell commands cannot write under `/mnt`. Copying the repository to a Windows folder then has to be done from Windows (for example `git pull` in the Windows clone) or by the owner in a plain terminal.

@@ -197,7 +197,7 @@ def test_tier_never_reaches_external_candidate_and_only_goes_down(status, crit, 
     assert TIER_ORDER[worse] <= TIER_ORDER[tier]
 
 
-@pytest.mark.cnil("CNIL-01")
+@pytest.mark.cnil("CNIL-02")
 def test_export_gate_refuses_a_higher_tier_and_has_no_override(base, tmp_path):
     ds = generate(base[3], 20, seed=1)
     rec = _assess(base, ds)
@@ -275,3 +275,25 @@ def test_the_single_extreme_value_is_not_reproduced(tmp_path):
     cat = {e["class"]: e for e in res.source_report["exception_catalogue"] if e["column"] == "age"}
     assert cat["numeric.magnitude_outlier"]["count"] == "<10"  # the class is reported, the exact count is masked
     assert sum(1 for a in ages if len(a) == 3) >= 1  # the pattern (a three-digit age) is still represented
+
+
+@pytest.mark.cnil("CNIL-01")
+def test_no_reversal_material_in_the_bundle(tmp_path):
+    """Nothing in the bundle points back at source records: no row numbers, file name, path or hash."""
+    import hashlib
+
+    from tests.conftest import read_bundle_texts
+
+    out = str(tmp_path / "bundle")
+    run(SRC, policy_id="internal-dev", rows=40, seed=2, out_dir=out)
+    texts = read_bundle_texts(out)
+    digest = hashlib.sha256(open(SRC, "rb").read()).hexdigest()
+    for name, text in texts.items():
+        assert "customers_hidden" not in text, name
+        assert os.path.dirname(SRC) not in text, name
+        assert digest not in text and digest[:16] not in text, name
+        assert '"_private"' not in text, name
+    manifest = json.loads(texts["scenario_manifest.json"])["manifest"]
+    assert manifest and all(max(e["data_rows"], default=0) <= 40 for e in manifest)  # generated rows only
+    record = json.loads(texts["assessment_record.json"])
+    assert record["information_flow"]["generator_inputs"] == ["Dataset Contract", "row counts", "seed"]

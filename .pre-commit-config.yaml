@@ -1,0 +1,10 @@
+# Runs the same repository scan as the gate and CI, for commits made by people.
+repos:
+  - repo: local
+    hooks:
+      - id: anonimizer-scan-repo
+        name: Anonimizer repository scan (data files, secrets, machine paths, forbidden claims)
+        entry: python tools/scan_repo.py --staged
+        language: system
+        pass_filenames: false
+        always_run: true

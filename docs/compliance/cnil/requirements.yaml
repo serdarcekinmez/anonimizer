@@ -1,0 +1,90 @@
+# CNIL requirements as this project reads them. Quotes are short extracts of the page recorded in SOURCE.md.
+# strength: definition | advice | criterion | required-if | description
+version: 1
+source_sha256: 15c098cc374c4b3b709904dd3004236fed3f34ed2a6eca349e5f479fb6d32cbc
+requirements:
+  - id: CNIL-01
+    section: "Qu'est-ce que l'anonymisation ?"
+    quote: "de manière irréversible"
+    strength: definition
+    interpretation: No retained mapping, key or index may allow an external-tier output to be traced back to source records.
+  - id: CNIL-02
+    section: "Qu'est-ce que l'anonymisation ?"
+    quote: "ne doit pas être confondue avec la pseudonymisation"
+    strength: definition
+    interpretation: Stable identifiers are personal data whatever else is transformed. Pseudonymised output is never labelled or tiered as anonymous.
+  - id: CNIL-03
+    section: "Pourquoi anonymiser des données personnelles ?"
+    quote: "ne s'applique plus"
+    strength: definition
+    interpretation: The word carries legal weight, so the product's wording about its outputs is controlled.
+  - id: CNIL-04
+    section: "Comment anonymiser tout en préservant au maximum l'utilité du jeu de données ?"
+    quote: "identifier les informations à conserver selon leur pertinence"
+    strength: advice
+    interpretation: What is kept is an explicit, recorded decision per column.
+  - id: CNIL-05
+    section: "Comment anonymiser tout en préservant au maximum l'utilité du jeu de données ?"
+    quote: "supprimer les éléments d'identification directe ainsi que les valeurs rares"
+    strength: advice
+    interpretation: Direct identifiers never pass through; rare values and outliers are handled by the selected policy.
+  - id: CNIL-06
+    section: "Comment anonymiser tout en préservant au maximum l'utilité du jeu de données ?"
+    quote: "distinguer les informations importantes des informations secondaires ou inutiles"
+    strength: advice
+    interpretation: Minimisation; columns nobody decided to keep should not be released.
+  - id: CNIL-07
+    section: "Comment anonymiser tout en préservant au maximum l'utilité du jeu de données ?"
+    quote: "définir la finesse idéale et acceptable"
+    strength: advice
+    interpretation: Granularity is an explicit choice recorded with the output.
+  - id: CNIL-08
+    section: "Comment anonymiser tout en préservant au maximum l'utilité du jeu de données ?"
+    quote: "randomisation"
+    strength: description
+    interpretation: Randomisation techniques (noise, permutation) are one family of transformations; applies to Mode A.
+  - id: CNIL-09
+    section: "Comment anonymiser tout en préservant au maximum l'utilité du jeu de données ?"
+    quote: "généralisation"
+    strength: description
+    interpretation: Generalisation changes the scale of attributes; applies to Mode A and to how Mode B derives pattern classes.
+  - id: CNIL-10
+    section: "Comment vérifier l'efficacité de l'anonymisation ?"
+    quote: "l'individualisation"
+    strength: criterion
+    interpretation: It must not be possible to isolate an individual in the output.
+  - id: CNIL-11
+    section: "Comment vérifier l'efficacité de l'anonymisation ?"
+    quote: "la corrélation"
+    strength: criterion
+    interpretation: It must not be possible to link records about the same individual across datasets or releases.
+  - id: CNIL-12
+    section: "Comment vérifier l'efficacité de l'anonymisation ?"
+    quote: "l'inférence"
+    strength: criterion
+    interpretation: It must not be possible to deduce, with near certainty, new information about an individual.
+  - id: CNIL-13
+    section: "Comment se prémunir des risques liés à l'anonymisation ?"
+    quote: "évaluation approfondie des risques d'identification"
+    strength: required-if
+    interpretation: Where the three criteria are not all fully met, a documented assessment of the residual re-identification risk is required.
+  - id: CNIL-14
+    section: "Comment se prémunir des risques liés à l'anonymisation ?"
+    quote: "veille régulière"
+    strength: advice
+    interpretation: Assessments age; the reference, the threat model and each assessment carry a review date.
+  - id: CNIL-15
+    section: "Comment se prémunir des risques liés à l'anonymisation ?"
+    quote: "violation de données"
+    strength: advice
+    interpretation: A controller must be able to identify and withdraw what was released if a release turns out to contain personal data.
+  - id: CNIL-16
+    section: "(whole page)"
+    quote: "responsable de traitement"
+    strength: definition
+    interpretation: The demonstration rests with the data controller. The tool supports that assessment and never replaces it.
+  - id: REF-WP216
+    section: "Les textes de référence"
+    quote: "Avis 05/2014"
+    strength: description
+    interpretation: Technique-level detail lives in WP216, which has not been ingested.

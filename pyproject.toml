@@ -22,7 +22,7 @@ packages = ["src/anonimizer"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q -p no:cacheprovider"
+addopts = "-p no:cacheprovider"
 markers = [
   "cnil(id): links a test to a row of docs/compliance/rtm.yaml",
   "slow: large-file performance checks (run with --runslow)",

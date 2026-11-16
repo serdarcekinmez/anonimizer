@@ -74,6 +74,7 @@ def test_file_level_facts(profiles):
             "workbook.defined_names", "workbook.author_metadata"} <= classes
 
 
+@pytest.mark.cnil("ANON-02")
 def test_single_text_value_deep_in_a_numeric_column(tmp_path):
     """The directive's named case: one text value far down a large numeric column."""
     from build_fixtures import build_customers

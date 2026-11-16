@@ -1,0 +1,61 @@
+# Findings register. Category: DEFECT | RISK | EVIDENCE-GAP | JUDGMENT | SOURCE-DRIFT.
+# Severity: blocker | high | medium | low. Status: open | dispositioned | closed.
+# Entries below were raised by the implementer during the build of 2026-11-16. No cnil-observer run has taken place.
+version: 1
+findings:
+  - id: F-001
+    category: RISK
+    severity: high
+    rtm_row: CNIL-10
+    summary: No attack-based evaluation of synthetic output (singling-out, linkability, inference against a held-out baseline).
+    remedy: Evaluate an attack framework as a development dependency and add it to the release gate. Until then the EXTERNAL_CANDIDATE tier stays unavailable in code.
+    status: open
+    disposition: ""
+  - id: F-002
+    category: EVIDENCE-GAP
+    severity: high
+    rtm_row: REF-WP216
+    summary: WP216 (Avis 05/2014), to which the CNIL page delegates technique detail, has not been ingested.
+    remedy: Ingest it with the same provenance procedure and extend rows CNIL-08 to CNIL-13.
+    status: open
+    disposition: ""
+  - id: F-003
+    category: JUDGMENT
+    severity: high
+    rtm_row: CNIL-06
+    summary: Columns are proposed as kept until a person decides, instead of dropped by default; unconfirmed output is LOCAL_ONLY.
+    remedy: Owner to accept the deviation recorded in ADR 0002 or require drop-by-default.
+    status: open
+    disposition: ""
+  - id: F-004
+    category: RISK
+    severity: medium
+    rtm_row: ANON-03
+    summary: Column, sheet and table names are copied to outputs and reports; their review by a person is asked for but not enforced.
+    remedy: Add an explicit header-review confirmation to the contract and the interface.
+    status: open
+    disposition: ""
+  - id: F-005
+    category: EVIDENCE-GAP
+    severity: medium
+    rtm_row: CNIL-03
+    summary: No cnil-observer assessment has been run on the architecture, the tests or this release.
+    remedy: Run /anon-cnil architecture and /anon-cnil release in a Claude Code session and commit the reports.
+    status: open
+    disposition: ""
+  - id: F-006
+    category: RISK
+    severity: medium
+    rtm_row: CNIL-05
+    summary: Under the internal-dev policy, reports show exact small counts (for example "1 row has this pattern").
+    remedy: Accepted by design for internal use; use external-strict when reports leave the team.
+    status: open
+    disposition: ""
+  - id: F-007
+    category: EVIDENCE-GAP
+    severity: medium
+    rtm_row: ANON-03
+    summary: The web interface script was executed in an embedded JavaScript engine with a test DOM, not in a real browser.
+    remedy: Manual pass in a browser, then a browser-driven test.
+    status: open
+    disposition: ""

@@ -29,9 +29,12 @@ from .policy import (
     min_tier,
 )
 from .recipe import ParseRecipe, resolve_regions
+from .synth import generate
 
 PASSED, RESIDUAL, FAILED, NOT_EVALUABLE = "passed", "passed_with_residual_risk", "failed", "not_evaluable"
 MAX_QI_COMBINATIONS = 2_000_000
+MAX_CONTROL_SAMPLES = 30
+CONTROL_ROW_BUDGET = 60_000
 _TOKEN = re.compile(r"[^\s\"',;:|()\[\]{}<>=]+")
 _NUMERIC = re.compile(r"[+\-]?[\d.,\s%]+")
 
@@ -62,44 +65,40 @@ def _canon(text: str | None, numeric: bool) -> str | None:
     return t
 
 
-def domain_size(gen: dict | None) -> float:
-    """Rough number of distinct values a generator can emit (used for the chance model)."""
-    if not gen:
-        return 1.0
-    g = gen.get("g")
-    if g == "number":
-        dd = max((int(k) for k in (gen.get("dec_digits") or {"0": 1})), default=0)
-        total = 0.0
-        for k in (gen.get("int_digits") or {"3": 1}):
-            d = max(1, int(k))
-            total += (10.0 ** d if gen.get("leading_zeros") else 9.0 * 10.0 ** (d - 1))
-        return max(1.0, total * 10.0 ** dd)
-    if g in ("text_shape", "text_gshape"):
-        size = 1.0
-        for item in gen.get("shape", []):
-            n = item[1]
-            size *= {"A": 9.2, "a": 9.2, "C": 9.2, "9": 10.0, "X": 7.0, "x": 7.0, "S": 3.0}.get(item[0], 1.0) ** n
-            if size > 1e30:
-                break
-        return size
-    if g in ("text_kind", "text"):
-        kind = gen.get("kind", "alpha")
-        if kind in ("uuid", "email", "url", "words", "phrase", "sentence"):
-            return 1e12
-        lo = min((int(k) for k in (gen.get("length") or {"8": 1})), default=8)
-        return min(1e30, 9.2 ** max(1, lo // 2 + 1))
-    if g == "date":
-        y0, y1 = gen.get("year_min") or 2015, gen.get("year_max") or 2024
-        return max(1.0, (y1 - y0 + 1) * 365.0) * (86400.0 if "h:m" in gen.get("fmt", "") or "datetime" in gen.get("fmt", "") else 1.0)
-    if g == "bool":
-        return 2.0
-    if g == "mix":
-        return sum(domain_size(x) for _w, x in gen.get("of", []))
-    if g == "pool":
-        return domain_size(gen.get("of"))
-    if g == "category":
-        return len(gen.get("values", [])) + (domain_size(gen["other"].get("of")) if gen.get("other") else 0)
-    return 1e6
+def _is_identifier(col: dict) -> bool:
+    return col["sensitivity"]["class"] == "direct_identifier" or col["key"]["role"] in ("unique", "reference", "repeating")
+
+
+def _control_values(contract: dict, dataset: dict) -> dict[str, list[list[set]]]:
+    """Identifier values of independent datasets generated from the same contract with other seeds.
+
+    They estimate how many values coincide with the source by chance alone: the generator never
+    sees the source, so anything the real output shows beyond these controls needs explaining.
+    """
+    params = dataset.get("params") or {}
+    rows = params.get("rows")
+    if not rows:
+        return {}
+    n_total = sum(rows.values())
+    k = max(2, min(MAX_CONTROL_SAMPLES, CONTROL_ROW_BUDGET // max(1, n_total)))
+    out: dict[str, list[list[set]]] = {}
+    for i in range(k):
+        ctrl = generate(contract, dict(rows), seed=f"{params.get('seed')}/control/{i}", packing=params.get("packing", "auto"))
+        for name, gt in ctrl["tables"].items():
+            ct = next(t for t in contract["tables"] if t["name"] == name)
+            cols = [c for c in ct["columns"] if c["keep"]]
+            sets: list[set] = [set() for _ in cols]
+            for r in gt["rows"]:
+                if r["kind"] != "data":
+                    continue
+                for p, col in enumerate(cols):
+                    if p < len(r["cells"]) and _is_identifier(col):
+                        cell = r["cells"][p]
+                        key = _canon(cell.text, cell.kind == "n") if cell.kind != "" else None
+                        if key is not None:
+                            sets[p].add(key)
+            out.setdefault(name, []).append(sets)
+    return out
 
 
 def _artifact_tokens(artifacts: dict[str, str]) -> set[str]:
@@ -211,7 +210,6 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
     regions, _ = resolve_regions(recipe, source)
     by_name = {r.name: r for r in regions if r.include and r.kind == "table"}
     ctables = {t["name"]: t for t in contract["tables"]}
-    ptables = {t["name"]: t for t in private_profile["tables"]}
     extra_markers = {str(m).casefold() for m in contract.get("extra_markers", [])}
     public_words = set(DEFAULT_MARKERS) | extra_markers | set(BOOL_WORDS) | {c.casefold() for c in ERROR_CODES}
 
@@ -223,6 +221,7 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
     tokens = _artifact_tokens(artifacts) - tool_vocabulary()
     today_tokens = {today.isoformat()}
 
+    controls = _control_values(contract, dataset)
     states = {}
     for name, gt in dataset["tables"].items():
         ct = ctables[name]
@@ -248,7 +247,10 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
         informative = [sum(1 for p, k in enumerate(keys) if k is not None and len(postings[p][k]) <= cap)
                        for keys in row_keys]
         qi = [p for p, c in enumerate(cols) if c["sensitivity"]["class"] == "quasi_identifier"]
+        ctrl = controls.get(name, [])
+        id_cols = [p for p, c in enumerate(cols) if _is_identifier(c)]
         states[name] = {
+            "ctrl": ctrl, "ctrl_hits": [[set() for _ in cols] for _ in ctrl], "id_cols": set(id_cols),
             "cols": cols, "src_idx": src_idx, "approved": approved, "postings": postings, "cap": cap,
             "row_keys": row_keys, "informative": informative, "best": [0] * n_out, "n_out": n_out,
             "full_rows": {hash(tuple(k)) for k in row_keys}, "full_hits": 0,
@@ -287,6 +289,10 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
                         keys.append(None)
                         continue
                     keys.append(key)
+                    if p in st["id_cols"]:
+                        for ci, sets in enumerate(st["ctrl"]):
+                            if key in sets[p]:
+                                st["ctrl_hits"][ci][p].add(key)
                     post = postings[p].get(key)
                     if post is not None:
                         st["overlap"][p].add(key)
@@ -323,8 +329,6 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
     literal_cols = []
     sensitive_literals = False
     for name, st in states.items():
-        pt = ptables.get(name, {"columns": []})
-        pcols = {c["id"]: c for c in pt["columns"]}
         for rid in range(st["n_out"]):
             inf = st["informative"][rid]
             if inf < policy.min_informative_cells:
@@ -349,7 +353,7 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
             observed = len(st["overlap"][p])
             entry = {"table": name, "column": col["name"], "distinct_synthetic_values": distinct_syn,
                      "values_also_in_source": observed}
-            is_id = col["sensitivity"]["class"] == "direct_identifier" or col["key"]["role"] in ("unique", "reference", "repeating")
+            is_id = _is_identifier(col)
             if col["value_policy"]["mode"] != "synthetic":
                 literal_cols.append({"table": name, "column": col["name"],
                                      "approved_values": len(col["value_policy"].get("approved_literals", [])),
@@ -361,18 +365,18 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
                 if observed:
                     info_cols.append(entry)
                 continue
-            src_distinct = (pcols.get(col["id"], {}).get("distinct") or {}).get("n_distinct", 0)
-            space = domain_size(col["base_gen"])
-            pch = min(1.0, src_distinct / space) if space > 0 else 1.0
-            expected = distinct_syn * pch
-            allowed = distinct_syn if pch >= 0.999 else min(
-                distinct_syn, int(expected + 3 * math.sqrt(expected * (1 - pch)) + 0.5) + policy.identifier_overlap_slack)
-            entry.update(expected_by_chance=round(expected, 3), allowed=allowed,
+            chance = [len(h[p]) for h in st["ctrl_hits"]]
+            mean = sum(chance) / len(chance) if chance else 0.0
+            allowed = min(distinct_syn, max(max(chance, default=0), int(mean + 3 * math.sqrt(mean) + 0.5))
+                          + policy.identifier_overlap_slack)
+            is_dense = mean >= max(0.5, 0.01 * distinct_syn)
+            entry.update(control_samples=len(chance), most_coincidences_in_a_control_sample=max(chance, default=0),
+                         expected_by_chance=round(mean, 2), allowed=allowed,
                          verdict="within_chance" if observed <= allowed else "exceeds_chance",
-                         dense_value_space=pch >= 0.01)
+                         dense_value_space=is_dense)
             if observed > allowed:
                 link_failed = True
-            if observed and pch >= 0.01:
+            if observed and is_dense:
                 dense = True
             link_cols.append(entry)
         artifact_hits += sum(st["artifact_hits"].values())
@@ -410,8 +414,8 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
                          "method": "closest source row per synthetic row on informative cells; replication of "
                                    "source-unique quasi-identifier combinations"},
         "linkability": {"status": l_status, "metrics": {"identifier_columns": link_cols},
-                        "method": "synthetic identifier values found in the source, compared with the number "
-                                  "expected by chance for the generator's value space",
+                        "method": "synthetic identifier values found in the source, compared with the same count "
+                                  "for independent control datasets generated from the same contract with other seeds",
                         "note": "Fictional keys repeating inside or across synthetic tables are intended "
                                 "structure and are not counted as a risk."},
         "inference": {"status": i_status,

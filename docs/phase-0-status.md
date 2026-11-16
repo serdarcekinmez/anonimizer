@@ -1,47 +1,24 @@
 # Phase 0 status
 
-Phase 0 builds the development workshop and the compliance baseline. No application code is written in this phase. Only Phase 0 is authorized; later phases and any merge into `main` need the project owner's approval.
+Superseded on 2026-11-16 by [status.md](status.md). Kept for the history of the plan.
 
-Last updated: 2026-11-12.
+On 2026-11-16 the owner replaced the Phase 0-only authorization with a product build directive: implement Mode B end to end in one session, keeping the approved architecture and its security constraints. The steps below show where each Phase 0 item stands after that build.
 
-## Steps
-
-| # | Step | Status | Output |
-|---|---|---|---|
-| 1 | Read-only environment survey | Done; one isolation condition failed | [environment.md](environment.md) |
-| 2 | Read the official Claude Code documentation and record the assumptions the workshop relies on | Done, except the hook logging experiment | [adr/0001-claude-code-assumptions.md](adr/0001-claude-code-assumptions.md) |
-| 3 | Repository: init, connect to GitHub, branch, `.gitignore`, README | Done | This branch |
-| 4 | Python skeleton: project file, package, ruff, pyright, pytest, import rules | **On hold** | — |
-| 5 | `tools/scan_repo.py`, `tools/gate.py` with tests | On hold | — |
-| 6 | `CLAUDE.md`, `.claude/settings.json`, rules `privacy.md`, `compliance.md` | On hold | — |
-| 7 | Phase 0 hooks with tests | On hold | — |
-| 8 | pre-commit and `ci.yml` | On hold | — |
-| 9 | Documents: requirements, threat model, classification, limitations, ADRs for decisions F1–F12 | On hold | Architecture already published: [architecture.md](architecture.md) |
-| 10 | Compliance baseline: CNIL source record, requirements, traceability matrix, findings register, `check_rtm.py` | On hold | — |
-| 11 | `review-protocol`, `cnil-observer`, `/anon-cnil`, `/anon-cnil-refresh`, `/anon-feature`, `/anon-gate`, `/anon-adr` | On hold | — |
-| 12 | Acceptance drills and Phase 0 report for owner sign-off | On hold | — |
-
-## Open blocker
-
-The approved plan makes the existing WSL2 environment acceptable only with a verified, fail-closed shell sandbox. The sandbox needs the `bubblewrap` and `socat` packages. Both are missing, and installing them needs the owner's password:
-
-```
-sudo apt-get install bubblewrap socat
-```
-
-Until then, steps 4–12 stay on hold. They install tools and run project code, and the owner's instruction is not to bypass the isolation requirement.
-
-## Not done in step 2
-
-The planned experiment (a temporary logging hook capturing real hook input from the main session and from a subagent) needs a separate Claude Code session. Hook tests in step 7 will use inputs built from the documented schema until it is run.
-
-## Changes to the approved plan since approval
-
-| Date | Change | Source |
+| # | Step | Status |
 |---|---|---|
-| 2026-11-12 | Commits and pushes of verified, non-sensitive work to GitHub are authorized on the `phase-0-foundation` branch, with a pull request against `main`. This replaces "no push without confirmation" in [architecture.md](architecture.md). Merging still needs owner approval. | Owner instruction |
-| 2026-11-12 | The workspace is the only directory used for the project. Other projects on the machine are not explored or read. Claude Code's own configuration may be read for verification. | Owner instruction |
+| 1 | Read-only environment survey | Done, updated: [environment.md](environment.md) |
+| 2 | Claude Code assumptions | Done except the hook logging experiment: [adr/0001-claude-code-assumptions.md](adr/0001-claude-code-assumptions.md). Settings keys re-checked against the published settings schema on 2026-11-16 |
+| 3 | Repository, branch, `.gitignore`, README | Done |
+| 4 | Python project, package, ruff, pytest, import rules | Done. pyright not set up |
+| 5 | `tools/scan_repo.py`, `tools/gate.py` with tests | Done |
+| 6 | `CLAUDE.md`, `.claude/settings.json`, rules | Done. Rules: privacy, compliance, parsing, testing. Settings untested in a live session |
+| 7 | Hooks with tests | Partial: `guard_paths`, `guard_commit`. Not written: `session_check`, `prompt_guard`, `format_file`, `stop_gate` |
+| 8 | pre-commit and `ci.yml` | Written. CI has not run (nothing was pushed from this environment) |
+| 9 | Documents | Threat model, classification, limitations, ADR 0002. One ADR covers the build's decisions instead of one per F-item |
+| 10 | Compliance baseline | Source record with hash, requirements, matrix, findings register, `check_rtm.py`. WP216 not ingested; no attack-library licence check |
+| 11 | Reviewers and skills | `review-protocol`, `cnil-observer`, `privacy-auditor`, `fidelity-reviewer`, `/anon-gate`, `/anon-cnil`, `/anon-review`. Not written: `corpus-builder`, `/anon-feature`, `/anon-adr`, `/anon-fixture`, `/anon-phase`, `/anon-cnil-refresh` (a script, `tools/cnil_source.py`, does the refresh) |
+| 12 | Acceptance drills and sign-off | Not done. No reviewer has run; the owner has not signed off |
 
-## Evidence
+## The blocker of 2026-11-12
 
-No tests exist yet, so there are no test results to publish. Evidence for steps 1–3 is the two survey documents and this branch's history.
+`bubblewrap` and `socat` are installed now. Claude Code's own sandbox was still not active in the build session, so project code ran through `tools/sbx`, a bubblewrap wrapper that fails closed. See [environment.md](environment.md) and ADR 0002 item 1.
