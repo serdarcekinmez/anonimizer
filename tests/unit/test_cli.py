@@ -113,3 +113,97 @@ def test_policies_command(capsys):
     assert main(["policies"]) == 0
     out = capsys.readouterr().out
     assert "internal-dev" in out and "external-strict" in out
+
+
+# ASTRA-01: the output of a run never replaces the source or an existing file.
+
+def _source_dir(tmp_path):
+    """A synthetic source file alone in its own directory."""
+    d = tmp_path / "data"
+    d.mkdir()
+    src = d / "synthetic.csv"
+    src.write_text("id,amount\n" + "".join(f"{i},{i * 3}.5\n" for i in range(1, 51)), encoding="utf-8")
+    return d, src
+
+
+def _gen(src, out, *extra):
+    return main(["generate", str(src), "--policy", "internal-dev", "-n", "7", "--out", str(out), *extra])
+
+
+def test_output_into_the_source_directory_is_refused_and_the_source_is_unchanged(tmp_path, capsys):
+    d, src = _source_dir(tmp_path)
+    before = src.read_bytes()
+    assert _gen(src, d) == 4
+    assert src.read_bytes() == before
+    assert sorted(p.name for p in d.iterdir()) == ["synthetic.csv"]
+    err = capsys.readouterr().err
+    assert "refused" in err and "new or empty directory" in err and "synthetic" not in err
+
+
+def test_output_onto_the_source_file_itself_is_refused(tmp_path, capsys):
+    _d, src = _source_dir(tmp_path)
+    before = src.read_bytes()
+    assert _gen(src, src) == 4
+    assert src.read_bytes() == before
+    capsys.readouterr()
+
+
+def test_a_second_run_into_the_same_directory_is_refused_and_the_first_bundle_is_kept(tmp_path, capsys):
+    _d, src = _source_dir(tmp_path)
+    out = tmp_path / "o"
+    assert _gen(src, out) == 0
+    first = {p.name: p.read_bytes() for p in out.iterdir()}
+    assert _gen(src, out, "--seed", "2") == 4
+    assert {p.name: p.read_bytes() for p in out.iterdir()} == first
+    capsys.readouterr()
+
+
+def test_an_existing_empty_directory_is_accepted(tmp_path, capsys):
+    _d, src = _source_dir(tmp_path)
+    out = tmp_path / "empty"
+    out.mkdir()
+    assert _gen(src, out) == 0
+    assert (out / "synthetic.csv").exists() and (out / "report.md").exists()
+    capsys.readouterr()
+
+
+def test_a_symbolic_link_to_the_source_directory_is_refused(tmp_path, capsys):
+    d, src = _source_dir(tmp_path)
+    before = src.read_bytes()
+    link = tmp_path / "link"
+    link.symlink_to(d, target_is_directory=True)
+    assert _gen(src, link) == 4
+    assert src.read_bytes() == before and sorted(p.name for p in d.iterdir()) == ["synthetic.csv"]
+    capsys.readouterr()
+
+
+def test_an_existing_private_profile_is_not_overwritten(tmp_path, capsys):
+    _d, src = _source_dir(tmp_path)
+    priv = tmp_path / "priv"
+    priv.mkdir()
+    old = priv / "source_profile.PRIVATE.json"
+    old.write_text("{}", encoding="utf-8")
+    assert _gen(src, tmp_path / "o", "--private-dir", str(priv)) == 4
+    assert old.read_text(encoding="utf-8") == "{}"
+    assert not (tmp_path / "o").exists()  # refused before anything was written
+    capsys.readouterr()
+
+
+@pytest.mark.parametrize("command", [["contract", "--policy", "internal-dev", "-o"], ["inspect", "--recipe-out"]])
+def test_single_file_outputs_never_replace_the_source(tmp_path, command, capsys):
+    _d, src = _source_dir(tmp_path)
+    before = src.read_bytes()
+    assert main([command[0], str(src), *command[1:], str(src)]) == 4
+    assert src.read_bytes() == before
+    capsys.readouterr()
+
+
+def test_profile_outputs_never_replace_the_source(tmp_path, capsys):
+    d = tmp_path / "data"
+    d.mkdir()
+    src = d / "source_report.json"  # a CSV that happens to carry the report's file name
+    src.write_text("id,amount\n" + "".join(f"{i},{i}\n" for i in range(1, 21)), encoding="utf-8")
+    before = src.read_bytes()
+    assert main(["profile", str(src), "--policy", "internal-dev", "--out", str(d)]) == 4
+    assert src.read_bytes() == before
+    capsys.readouterr()

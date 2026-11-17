@@ -211,6 +211,9 @@ def test_export_gate_refuses_a_higher_tier_and_has_no_override(base, tmp_path):
         export_bundle(str(tmp_path / "b"), dataset_bytes=data, dataset_ext=ext, documents={}, assessment=forged)
     with pytest.raises(ExportRefused):
         export_bundle(str(tmp_path / "c"), dataset_bytes=data, dataset_ext=ext, documents={"../x.json": {}}, assessment=rec)
+    # A refused bundle leaves nothing behind: no partial directory and no staging directory (ASTRA-01).
+    assert not os.path.exists(tmp_path / "c")
+    assert not [p for p in os.listdir(tmp_path) if p.startswith(".anonimizer-staging")]
     ok = export_bundle(str(tmp_path / "d"), dataset_bytes=data, dataset_ext=ext, documents={}, assessment=rec,
                        requested_tier=LOCAL_ONLY)
     assert ok["release_tier"] == LOCAL_ONLY

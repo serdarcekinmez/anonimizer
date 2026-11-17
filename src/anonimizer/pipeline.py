@@ -9,7 +9,14 @@ import tempfile
 from dataclasses import dataclass, field
 
 from . import contract as contract_mod
-from .export import export_bundle, manifest_csv, render_dataset
+from .export import (
+    check_new_file,
+    check_output_dir,
+    export_bundle,
+    manifest_csv,
+    render_dataset,
+    write_new_file,
+)
 from .policy import PrivacyPolicy, get_policy
 from .privacy import assess, not_assessed
 from .profile import build_profile, to_shareable
@@ -34,6 +41,16 @@ class RunResult:
     comparison: dict
     report_markdown: str
     private_files: list = field(default_factory=list)
+
+
+PRIVATE_PROFILE_NAME = "source_profile.PRIVATE.json"
+
+
+def check_targets(source: str, out_dir: str, private_dir: str | None = None) -> None:
+    """Refuse, before any work, output locations that could replace the source or an earlier output."""
+    check_output_dir(out_dir)
+    if private_dir:
+        check_new_file(os.path.join(private_dir, PRIVATE_PROFILE_NAME), (source,))
 
 
 def inspect(path: str, recipe: ParseRecipe | None = None) -> dict:
@@ -73,6 +90,7 @@ def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, s
                         requested_tier: str | None = None, require_full_coverage: bool = False,
                         skip_assessment: bool = False, register_path: str | None = None,
                         today: _dt.date | None = None) -> RunResult:
+    check_targets(path, out_dir, private_dir)
     policy = contract_mod.validate_contract(contract)
     dataset = generate(contract, rows, seed=seed, packing=packing)
     data, ext, out_recipe = render_dataset(contract, dataset)
@@ -119,11 +137,8 @@ def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, s
                            assessment=assessment, requested_tier=requested_tier, register_path=register_path)
     private_files = []
     if private_dir:
-        os.makedirs(private_dir, mode=0o700, exist_ok=True)
-        ppath = os.path.join(private_dir, "source_profile.PRIVATE.json")
-        fd = os.open(ppath, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(private_profile, fh, ensure_ascii=False, indent=2)
+        ppath = os.path.join(private_dir, PRIVATE_PROFILE_NAME)
+        write_new_file(ppath, json.dumps(private_profile, ensure_ascii=False, indent=2).encode("utf-8"))
         private_files.append(ppath)
     result = RunResult(export, assessment, coverage, manifest, contract, source_report, generated_report,
                        comparison, report_md, private_files)
@@ -141,6 +156,7 @@ def run(path: str, *, policy_id: str, rows, seed=0, packing: str = "auto", recip
     recipe = recipe or ParseRecipe()
     decisions = {k: options.pop(k) for k in ("drop", "sensitivity", "keep_categories", "approved_by", "confirm_by",
                                               "rename") if k in options}
+    check_targets(path, out_dir, options.get("private_dir"))
     private, shareable = profile_source(path, recipe, policy)
     if contract is None:
         contract = contract_mod.build_contract(shareable, policy)

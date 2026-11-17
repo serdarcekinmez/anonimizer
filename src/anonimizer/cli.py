@@ -14,7 +14,7 @@ import traceback
 
 from . import NON_CERTIFICATION_STATEMENT, __version__
 from .contract import ContractError, build_contract, dumps
-from .export import ExportRefused
+from .export import ExportRefused, check_new_file, write_new_file
 from .grid import GridError
 from .policy import POLICIES, PolicyError, get_policy
 from .recipe import ParseRecipe, RecipeError
@@ -32,6 +32,12 @@ def _recipe(args) -> ParseRecipe:
     for m in getattr(args, "marker", None) or []:
         r.extra_markers.append(m)
     return r
+
+
+def _not_the_source(output: str, source: str) -> None:
+    """A single output file named by the user may replace an earlier output, never the input file."""
+    if os.path.exists(output) and os.path.exists(source) and os.path.samefile(output, source):
+        raise ExportRefused("the output file would replace the input file")
 
 
 def _split_ref(ref: str, tables: list[str]) -> tuple[str, str]:
@@ -55,6 +61,8 @@ def _print_regions(recipe: dict) -> None:
 def cmd_inspect(args) -> int:
     from .pipeline import inspect
 
+    if args.recipe_out:
+        _not_the_source(args.recipe_out, args.file)
     res = inspect(args.file, _recipe(args))
     f = res["file"]
     if f["format"] == "csv":
@@ -90,31 +98,32 @@ def _print_catalogue(report: dict) -> None:
 
 
 def cmd_profile(args) -> int:
-    from .pipeline import profile_source
+    from .pipeline import PRIVATE_PROFILE_NAME, profile_source
     from .reports import summarize_profile
 
     policy = get_policy(args.policy)
+    report_path = os.path.join(args.out, "source_report.json") if args.out else None
+    private_path = os.path.join(args.private_dir, PRIVATE_PROFILE_NAME) if args.private_dir else None
+    for path in (report_path, private_path):
+        if path:
+            check_new_file(path, (args.file,))
     private, shareable = profile_source(args.file, _recipe(args), policy)
     report = summarize_profile(shareable, "source")
     _print_catalogue(report)
-    if args.out:
-        os.makedirs(args.out, mode=0o700, exist_ok=True)
-        with open(os.path.join(args.out, "source_report.json"), "w", encoding="utf-8") as fh:
-            json.dump(report, fh, indent=2, ensure_ascii=False)
-        print(f"\nShareable source report written to {os.path.join(args.out, 'source_report.json')}")
-    if args.private_dir:
-        os.makedirs(args.private_dir, mode=0o700, exist_ok=True)
-        path = os.path.join(args.private_dir, "source_profile.PRIVATE.json")
-        fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as fh:
-            json.dump(private, fh, indent=2, ensure_ascii=False)
-        print(f"PRIVATE diagnostic profile (source row numbers, category values) written to {path}. Do not share it.")
+    if report_path:
+        write_new_file(report_path, (json.dumps(report, indent=2, ensure_ascii=False)).encode("utf-8"))
+        print(f"\nShareable source report written to {report_path}")
+    if private_path:
+        write_new_file(private_path, json.dumps(private, indent=2, ensure_ascii=False).encode("utf-8"))
+        print(f"PRIVATE diagnostic profile (source row numbers, category values) written to {private_path}. "
+              f"Do not share it.")
     return EXIT_OK
 
 
 def cmd_contract(args) -> int:
     from .pipeline import profile_source
 
+    _not_the_source(args.output, args.file)
     policy = get_policy(args.policy)
     _private, shareable = profile_source(args.file, _recipe(args), policy)
     contract = build_contract(shareable, policy)
@@ -266,7 +275,7 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--rows-for", action="append", metavar="TABLE=N", help="row count for one table")
     sp.add_argument("--seed", default="0", help="seed (same contract and seed give identical output)")
     sp.add_argument("--contract", help="reviewed Dataset Contract (JSON)")
-    sp.add_argument("--out", required=True, help="output directory")
+    sp.add_argument("--out", required=True, help="output directory; must be new or empty (nothing is overwritten)")
     sp.add_argument("--packing", choices=["auto", "isolate", "packed"], default="auto")
     sp.add_argument("--require-full-coverage", action="store_true", help="exit with status 3 if a scenario is left out")
     sp.add_argument("--drop", action="append", metavar="TABLE.COLUMN", help="drop a column")

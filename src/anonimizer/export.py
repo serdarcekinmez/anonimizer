@@ -13,6 +13,8 @@ import io
 import json
 import os
 import re
+import shutil
+import tempfile
 import zipfile
 
 from . import NON_CERTIFICATION_STATEMENT, __version__
@@ -302,9 +304,45 @@ def manifest_csv(manifest: list[dict]) -> str:
 
 
 def _write(path: str, data: bytes) -> None:
-    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    """Create ``path``; never replace or follow an existing file."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0), 0o600)
     with os.fdopen(fd, "wb") as fh:
         fh.write(data)
+
+
+def check_output_dir(out_dir: str) -> None:
+    """Refuse an output directory that exists and is not empty, is a file, or is a symbolic link.
+
+    A new or empty directory cannot hold the source file or an earlier bundle, so nothing that
+    already exists can be replaced. Messages name the rule, not the path.
+    """
+    if os.path.islink(out_dir):
+        raise ExportRefused("the output directory must be a new or empty directory, not a symbolic link")
+    if os.path.exists(out_dir):
+        if not os.path.isdir(out_dir):
+            raise ExportRefused("the output must be a new or empty directory; an existing file was given")
+        if os.listdir(out_dir):
+            raise ExportRefused("the output must be a new or empty directory; the given directory already holds "
+                                "files, which are never overwritten")
+
+
+def check_new_file(path: str, protect: tuple[str, ...] = ()) -> None:
+    """Refuse a single output file that would replace a protected file (the source) or any existing file."""
+    for p in protect:
+        if os.path.exists(path) and os.path.exists(p) and os.path.samefile(path, p):
+            raise ExportRefused("the output file would replace the input file")
+    if os.path.lexists(path):
+        raise ExportRefused("an output file already exists and is never overwritten; choose another location")
+
+
+def write_new_file(path: str, data: bytes) -> None:
+    """Write a file the user asked for (a private profile) without replacing anything."""
+    check_new_file(path)
+    os.makedirs(os.path.dirname(path) or ".", mode=0o700, exist_ok=True)
+    try:
+        _write(path, data)
+    except FileExistsError:
+        raise ExportRefused("an output file already exists and is never overwritten; choose another location") from None
 
 
 def _json(obj) -> bytes:
@@ -317,6 +355,54 @@ def default_register_path() -> str:
         return env
     state = os.environ.get("XDG_STATE_HOME") or os.path.join(os.path.expanduser("~"), ".local", "state")
     return os.path.join(state, "anonimizer", "release_register.jsonl")
+
+
+def _write_bundle(stage: str, dataset_bytes: bytes, dataset_ext: str, documents: dict[str, object],
+                  assessment: dict, tier: str, base_name: str, now: _dt.datetime) -> tuple[list, dict]:
+    files = []
+    name = base_name + dataset_ext
+    _write(os.path.join(stage, name), dataset_bytes)
+    files.append(name)
+    label = {
+        "release_tier": tier, "label": TIER_LABELS[tier], "transformation_class": assessment["transformation_class"],
+        "assessment_status": assessment["assessment_status"], "policy": assessment["policy"]["id"],
+        "policy_version": assessment["policy"]["version"], "record_id": assessment["record_id"],
+        "created_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "tool_version": __version__,
+        "statement": NON_CERTIFICATION_STATEMENT,
+    }
+    docs = dict(documents)
+    docs["assessment_record.json"] = assessment
+    docs["release_label.json"] = label
+    docs["CLASSIFICATION.txt"] = (
+        f"{TIER_LABELS[tier]}\n\nTransformation class: {assessment['transformation_class']}\n"
+        f"Assessment status: {assessment['assessment_status']} (policy {assessment['policy']['id']} "
+        f"v{assessment['policy']['version']})\nRecord: {assessment['record_id']}\n\n{NON_CERTIFICATION_STATEMENT}\n"
+    )
+    for fname, obj in sorted(docs.items()):
+        if os.path.basename(fname) != fname or fname.startswith("."):
+            raise ExportRefused("document names must be plain file names")
+        data = obj.encode("utf-8") if isinstance(obj, str) else obj if isinstance(obj, bytes) else _json(obj)
+        _write(os.path.join(stage, fname), data)
+        files.append(fname)
+    return files, label
+
+
+def _move_into_place(stage: str, final_dir: str) -> None:
+    try:
+        os.rename(stage, final_dir)  # POSIX: succeeds only if the target is absent or an empty directory
+        return
+    except OSError:
+        pass
+    # Platforms where rename does not replace an empty directory: re-check, remove the empty
+    # target and retry once. Anything else is refused.
+    if os.path.isdir(final_dir) and not os.path.islink(final_dir) and not os.listdir(final_dir):
+        try:
+            os.rmdir(final_dir)
+            os.rename(stage, final_dir)
+            return
+        except OSError:
+            pass
+    raise ExportRefused("the output must be a new or empty directory; it changed while the bundle was written")
 
 
 def export_bundle(out_dir: str, *, dataset_bytes: bytes, dataset_ext: str, documents: dict[str, object],
@@ -340,32 +426,22 @@ def export_bundle(out_dir: str, *, dataset_bytes: bytes, dataset_ext: str, docum
     if tier == EXTERNAL_CANDIDATE:
         raise ExportRefused("the EXTERNAL_CANDIDATE tier is not available in this release")
     now = now or _dt.datetime.now(_dt.timezone.utc)
-    os.makedirs(out_dir, mode=0o700, exist_ok=True)
-    files = []
+    check_output_dir(out_dir)
+    final_dir = os.path.abspath(out_dir)
+    parent = os.path.dirname(final_dir)
+    os.makedirs(parent, mode=0o700, exist_ok=True)
+    # The bundle is written into a fresh staging directory next to the target and moved into
+    # place in one step, so a failure never leaves a half-written bundle and nothing that
+    # already exists is touched.
+    stage = tempfile.mkdtemp(prefix=".anonimizer-staging-", dir=parent)
+    try:
+        files, label = _write_bundle(stage, dataset_bytes, dataset_ext, documents, assessment, tier,
+                                           base_name, now)
+        _move_into_place(stage, final_dir)
+    except BaseException:
+        shutil.rmtree(stage, ignore_errors=True)
+        raise
     name = base_name + dataset_ext
-    _write(os.path.join(out_dir, name), dataset_bytes)
-    files.append(name)
-    label = {
-        "release_tier": tier, "label": TIER_LABELS[tier], "transformation_class": assessment["transformation_class"],
-        "assessment_status": assessment["assessment_status"], "policy": assessment["policy"]["id"],
-        "policy_version": assessment["policy"]["version"], "record_id": assessment["record_id"],
-        "created_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"), "tool_version": __version__,
-        "statement": NON_CERTIFICATION_STATEMENT,
-    }
-    docs = dict(documents)
-    docs["assessment_record.json"] = assessment
-    docs["release_label.json"] = label
-    docs["CLASSIFICATION.txt"] = (
-        f"{TIER_LABELS[tier]}\n\nTransformation class: {assessment['transformation_class']}\n"
-        f"Assessment status: {assessment['assessment_status']} (policy {assessment['policy']['id']} "
-        f"v{assessment['policy']['version']})\nRecord: {assessment['record_id']}\n\n{NON_CERTIFICATION_STATEMENT}\n"
-    )
-    for fname, obj in sorted(docs.items()):
-        if os.path.basename(fname) != fname or fname.startswith("."):
-            raise ExportRefused("document names must be plain file names")
-        data = obj.encode("utf-8") if isinstance(obj, str) else obj if isinstance(obj, bytes) else _json(obj)
-        _write(os.path.join(out_dir, fname), data)
-        files.append(fname)
     entry = {"created_utc": label["created_utc"], "record_id": assessment["record_id"], "release_tier": tier,
              "transformation_class": assessment["transformation_class"],
              "assessment_status": assessment["assessment_status"], "policy": assessment["policy"]["id"],
