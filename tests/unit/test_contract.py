@@ -193,3 +193,14 @@ def test_apply_naming_on_selected_or_all_kept_columns(contract):
         apply_naming(c, {"columns": [("table_1", "c2")], "mode": "sequence"})
     assert "not kept" in str(exc.value)
     validate_contract(c)
+
+
+def test_a_table_without_kept_columns_is_rejected_with_a_plain_message(contract):
+    """ASTRA-06: refused at the decision stage, not after generation with a layout error."""
+    c = copy.deepcopy(contract)
+    for col in c["tables"][0]["columns"]:
+        col["keep"] = False
+    with pytest.raises(ContractError) as exc:
+        validate_contract(c)
+    msg = str(exc.value)
+    assert "no column is kept" in msg and "keep at least one column" in msg and "last_col" not in msg

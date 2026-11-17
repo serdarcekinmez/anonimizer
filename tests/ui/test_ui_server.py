@@ -319,3 +319,13 @@ def test_column_names_endpoint_previews_without_changing_anything(ui):
     assert status == 400 and "2 selected column(s)" in data["error"]
     # Nothing was applied: the contract keeps its names until the decisions are applied.
     assert session.contract["tables"][0]["columns"][0]["name"] != "f_Alpha"
+
+
+def test_leaving_out_every_column_is_refused_when_decisions_are_applied(ui):
+    """ASTRA-06: the page hears it when it applies the decisions, in plain words."""
+    c, _server, _session = ui
+    assert c.post("/api/open", {"path": product_path("customers_hidden.csv")})[0] == 200
+    status, data = c.post("/api/profile", {"policy": "internal-dev"})
+    cols = [{"table": t["name"], "id": col["id"], "keep": False} for t in data["contract"]["tables"] for col in t["columns"]]
+    status, err = c.post("/api/contract", {"columns": cols})
+    assert status == 400 and "no column is kept" in err["error"]

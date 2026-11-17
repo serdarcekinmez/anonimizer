@@ -262,6 +262,9 @@ def validate_contract(contract: dict) -> PrivacyPolicy:
             _check_gen(col["base_gen"], allowed, where)
             for m in col["missing"]:
                 _check_gen(m["gen"], allowed, where)
+        if tab["columns"] and not any(c.get("keep") is True for c in tab["columns"]):
+            raise ContractError(f"table '{tab['name']}': no column is kept; keep at least one column, or leave the "
+                                f"table out by excluding its region in the table settings (parse recipe)")
         for sc in tab["scenarios"]:
             col = next((c for c in tab["columns"] if c["id"] == sc.get("column")), None)
             if sc.get("column") is not None and sc["column"] not in ids:

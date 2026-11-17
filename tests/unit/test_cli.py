@@ -251,3 +251,12 @@ def test_contract_command_applies_names_too(tmp_path, capsys):
     t1 = next(t for t in c["tables"] if t["name"] == "table_1")
     assert t2["columns"][0]["name"] == "Alpha" and t1["columns"][0]["name"] != "Alpha"
     capsys.readouterr()
+
+
+def test_dropping_every_column_is_refused_before_generation(tmp_path, capsys):
+    """ASTRA-06."""
+    d, src = _source_dir(tmp_path)
+    assert main(["generate", str(src), "--policy", "internal-dev", "-n", "5", "--out", str(tmp_path / "o"),
+                 "--drop", "id", "--drop", "amount"]) == 2
+    err = capsys.readouterr().err
+    assert "no column is kept" in err and "last_col" not in err and not (tmp_path / "o").exists()
