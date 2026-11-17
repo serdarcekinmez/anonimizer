@@ -12,7 +12,7 @@ title Anonimizer - WSL
 set "ARGS=--no-prompt %*"
 :run
 echo Starting Anonimizer in WSL (@DISTRO@)...
-"%SystemRoot%\System32\wsl.exe" --distribution "@DISTRO@" --cd "@ROOT@" --exec /usr/bin/python3 tools/launch_wsl.py %ARGS%
+"%SystemRoot%\System32\wsl.exe" --distribution @DISTRO@ --cd "@ROOT@" --exec /usr/bin/python3 tools/launch_wsl.py %ARGS%
 set "CODE=%ERRORLEVEL%"
 echo.
 if "%CODE%"=="3" goto ask
