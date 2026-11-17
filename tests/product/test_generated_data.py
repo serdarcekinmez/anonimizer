@@ -136,3 +136,58 @@ def test_require_full_coverage_fails_loudly(tmp_path):
     assert not res.coverage["full_coverage_of_reproducible"]
     report = json.load(open(tmp_path / "o" / "coverage_report.json"))
     assert report["tables"][0]["uncovered"]
+
+
+# ASTRA-04: full coverage is granted by what the generated file contains, not by the plan.
+def _sci_source(tmp_path):
+    vals = [f"{(i % 9) + 1}.{(i * 7) % 100:02d}E+{(i % 7) + 2:02d}" for i in range(49)] + ["0.00E+00"]
+    p = tmp_path / "sci.csv"
+    p.write_text("id,measure\n" + "".join(f"{i + 1},{v}\n" for i, v in enumerate(vals)), encoding="utf-8")
+    return str(p)
+
+
+def test_scientific_zero_is_found_at_its_manifest_location(tmp_path):
+    import csv
+
+    res = run(_sci_source(tmp_path), policy_id="internal-dev", rows=50, seed=1, out_dir=str(tmp_path / "o"),
+              require_full_coverage=True)
+    rows = list(csv.reader(open(tmp_path / "o" / "synthetic.csv", encoding="utf-8")))
+    zero = [e for e in res.manifest if e["class"] == "numeric.zero"]
+    assert zero and all(float(rows[loc["line"] - 1][loc["field"] - 1]) == 0.0 for e in zero for loc in e["locations"])
+    sv = res.comparison["scenario_verification"]
+    assert sv["covered_scenarios_not_found_again"] == [] and sv["failed_at_location"] == []
+    assert sv["verified_at_location"] >= 1
+
+
+def test_a_scenario_missing_from_the_output_withdraws_full_coverage(tmp_path, monkeypatch):
+    """If a planned cell-level case is not in the generated file, it is not covered."""
+    import anonimizer.pipeline as pipeline
+    from anonimizer.pipeline import CoverageError
+    from anonimizer.synth import OutCell
+
+    real = pipeline.generate
+
+    def broken(contract, rows, **kw):
+        ds = real(contract, rows, **kw)
+        t = ds["tables"]["table_1"]
+        j = t["columns"].index("c2")
+        data = [r for r in t["rows"] if r["kind"] == "data"]
+        for e in ds["manifest"]:
+            if e["class"] == "numeric.zero":
+                for r in e["data_rows"]:
+                    data[r - 1]["cells"][j] = OutCell("1.50E+03", "s")
+        return ds
+
+    monkeypatch.setattr(pipeline, "generate", broken)
+    with pytest.raises(CoverageError) as exc:
+        run(_sci_source(tmp_path), policy_id="internal-dev", rows=50, seed=1, out_dir=str(tmp_path / "o"),
+            require_full_coverage=True)
+    res = exc.value.result
+    assert res.coverage["full_coverage_of_reproducible"] is False
+    unc = [u for c in res.coverage["tables"] for u in c["uncovered"]]
+    assert [u["class"] for u in unc] == ["numeric.zero"]
+    assert "not found at its manifest location" in unc[0]["reason"]
+    table = res.coverage["tables"][0]
+    assert table["scenarios_covered"] == len(table["covered"]) and unc[0]["id"] not in table["covered"]
+    saved = json.loads((tmp_path / "o" / "coverage_report.json").read_text(encoding="utf-8"))
+    assert saved["full_coverage_of_reproducible"] is False

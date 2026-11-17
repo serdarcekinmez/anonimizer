@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from . import NON_CERTIFICATION_STATEMENT, __version__
 from .contract import describe
-from .profile import iter_exceptions
+from .profile import LOC_CAP, iter_exceptions
 
 
 def _col_summary(col: dict) -> dict:
@@ -161,7 +161,62 @@ def verify_relationships(contract: dict, dataset: dict) -> list[dict]:
     return results
 
 
-def compare(src: dict, out: dict, dataset: dict, contract: dict) -> dict:
+# Classes decided by one cell on its own. The generated file must show them at the manifest
+# location, or the scenario is not covered. Other classes depend on the rest of the column (rare
+# patterns and categories, outliers, deviations from a dominant format, key roles) and can
+# legitimately disappear in a small output; for them the profiler's finding is advisory.
+CELL_LEVEL_CLASSES = frozenset({
+    "missing.empty", "missing.quoted_empty", "missing.empty_string", "missing.whitespace", "missing.marker",
+    "type.text_in_number", "type.text_in_date", "type.text_in_boolean", "type.number_in_date",
+    "type.number_in_boolean", "type.date_in_number", "type.date_in_boolean", "type.boolean_in_number",
+    "type.boolean_in_date", "value.invalid_date", "xlsx.error_value", "storage.number_as_text",
+    "storage.date_as_text", "numeric.zero", "numeric.negative", "numeric.leading_zero", "numeric.explicit_plus",
+    "text.padded", "text.multiline", "text.non_ascii", "text.control_chars", "text.formula_like",
+})
+
+
+def verify_locations(contract: dict, dataset: dict, out_private: dict) -> dict:
+    """Check covered cell-level scenarios at their manifest locations in the generated file.
+
+    ``out_private`` is the full profile of the generated file (synthetic cells only); it is used
+    here and never exported. Returns ids and counts only.
+    """
+    covered = {sid for c in dataset["coverage"]["tables"] for sid in c["covered"]}
+    kept = {t["name"]: [c["id"] for c in t["columns"] if c["keep"]] for t in contract["tables"]}
+    out_tabs = {t["name"]: t for t in out_private["tables"]}
+    verified, failed, not_checked = 0, [], 0
+    for e in dataset["manifest"]:
+        if e["scenario_id"] not in covered:
+            continue
+        cols = kept.get(e["table"], [])
+        if e["class"] not in CELL_LEVEL_CLASSES or e["column"] not in cols or not e["locations"]:
+            not_checked += 1
+            continue
+        ot = out_tabs.get(e["table"])
+        k = cols.index(e["column"])
+        oc = ot["columns"][k] if ot is not None and k < len(ot["columns"]) else None
+        rows: set = set()
+        truncated = False
+        for ex in (oc or {}).get("exceptions", []):
+            if ex["class"] == e["class"]:
+                found = ex.get("_private", {}).get("rows", [])
+                rows.update(found)
+                truncated = truncated or len(found) >= LOC_CAP
+        missing = {loc["row"] for loc in e["locations"]} - rows
+        if truncated and rows:
+            missing = {r for r in missing if r <= max(rows)}  # rows past the cap were not recorded
+        if missing:
+            failed.append({"id": e["scenario_id"], "class": e["class"], "table": e["table"], "column": e["column"],
+                           "locations_without_the_class": len(missing)})
+        else:
+            verified += 1
+    return {"verified_at_location": verified, "failed_at_location": failed,
+            "not_checked_at_location": not_checked,
+            "location_check": "cell-level classes are looked up at their manifest location in the generated file; "
+                              "classes that depend on the rest of the column are not"}
+
+
+def compare(src: dict, out: dict, dataset: dict, contract: dict, out_private: dict | None = None) -> dict:
     """Compare the source profile with the profile of the generated file."""
     cov = {c["table"]: c for c in dataset["coverage"]["tables"]}
     out_tabs = {t["name"]: t for t in out["tables"]}
@@ -242,7 +297,8 @@ def compare(src: dict, out: dict, dataset: dict, contract: dict) -> dict:
         "structural_differences": structural,
         "file_level_classes_not_represented": sorted(s_file - o_file),
         "scenario_verification": {"covered_scenarios_found_again": verified,
-                                  "covered_scenarios_not_found_again": unverified},
+                                  "covered_scenarios_not_found_again": unverified,
+                                  **(verify_locations(contract, dataset, out_private) if out_private else {})},
         "relationship_verification": relationships,
         "statement": NON_CERTIFICATION_STATEMENT,
     }
@@ -346,6 +402,9 @@ def render_markdown(source: dict, generated: dict, comparison: dict, coverage: d
     sv = comparison["scenario_verification"]
     p.append(f"\nSelf-check: {sv['covered_scenarios_found_again']} covered scenario(s) were found again when the "
              f"generated file was profiled; {len(sv['covered_scenarios_not_found_again'])} were not.")
+    if sv.get("failed_at_location"):
+        p.append(f"\n{len(sv['failed_at_location'])} planned case(s) were not found at their manifest location in the "
+                 f"generated file; they are reported as not covered.")
     rel = comparison.get("relationship_verification") or []
     if rel:
         broken = sum(1 for r in rel if r["status"] == "broken")

@@ -191,6 +191,9 @@ def cmd_generate(args) -> int:
     sv = result.comparison["scenario_verification"]
     print(f"Self-check on the generated file: {sv['covered_scenarios_found_again']} covered scenario(s) found again, "
           f"{len(sv['covered_scenarios_not_found_again'])} not found again.")
+    if "verified_at_location" in sv:
+        print(f"Cell-level cases checked at their manifest location: {sv['verified_at_location']} present, "
+              f"{len(sv['failed_at_location'])} absent (reported as not covered).")
     a = result.assessment
     print(f"Privacy assessment: {a['assessment_status']}  |  release tier: {a['release_tier']}")
     for r in a["tier_reasons"]:

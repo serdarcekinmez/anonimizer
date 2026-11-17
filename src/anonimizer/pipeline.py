@@ -46,13 +46,25 @@ class RunResult:
 PRIVATE_PROFILE_NAME = "source_profile.PRIVATE.json"
 
 
-def reconcile_coverage(coverage: dict, comparison: dict) -> None:
+def reconcile_coverage(coverage: dict, comparison: dict, dataset_manifest: list = ()) -> None:
     """Coverage states what the planner placed; it is full only if the generated file confirms it.
 
-    A declared relationship that does not hold in the generated cells is reported as not
+    A cell-level scenario that the generated file does not show at its manifest location, and a
+    declared relationship that does not hold in the generated cells, are reported as not
     represented, and full coverage is withdrawn.
     """
     by_table = {c["table"]: c for c in coverage["tables"]}
+    for f in comparison.get("scenario_verification", {}).get("failed_at_location", []):
+        c = by_table.get(f["table"])
+        if c is None or f["id"] not in c["covered"]:
+            continue
+        c["covered"] = [i for i in c["covered"] if i != f["id"]]
+        c["scenarios_covered"] = len(c["covered"])
+        c["uncovered"].append({"id": f["id"], "class": f["class"], "column": f["column"],
+                               "description": next((e["description"] for e in dataset_manifest
+                                                    if e["scenario_id"] == f["id"]), f["class"]),
+                               "reason": "generated, but not found at its manifest location in the generated file"})
+        c["full_coverage"] = c["full_coverage_of_reproducible"] = False
     for r in comparison.get("relationship_verification", []):
         if r["status"] != "broken":
             continue
@@ -123,7 +135,10 @@ def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, s
         fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, "wb") as fh:
             fh.write(data)
-        out_profile = to_shareable(build_profile(tmp, ParseRecipe.from_dict(out_recipe)), policy)
+        # The full profile of the generated file holds synthetic cells only; it serves the
+        # location check below and is not exported.
+        out_private = build_profile(tmp, ParseRecipe.from_dict(out_recipe))
+        out_profile = to_shareable(out_private, policy)
     finally:
         try:
             os.remove(tmp)
@@ -132,9 +147,9 @@ def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, s
     source_report = summarize_profile(shareable, "source")
     generated_report = summarize_profile(out_profile, "generated")
     generated_report["generation"] = dataset["params"]
-    comparison = compare(shareable, out_profile, dataset, contract)
+    comparison = compare(shareable, out_profile, dataset, contract, out_private)
     coverage = dataset["coverage"]
-    reconcile_coverage(coverage, comparison)
+    reconcile_coverage(coverage, comparison, dataset["manifest"])
     manifest = dataset["manifest"]
     recipe_doc = private_profile["recipe"]
     documents = {

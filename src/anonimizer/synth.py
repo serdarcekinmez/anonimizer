@@ -382,7 +382,7 @@ class _TableGen:
                 ip = "0" + ip
         neg = bool(mods.get("neg")) or (not zero and not mods.get("_scenario") and rng.chance(g.get("p_neg", 0.0)))
         if base == "sci":
-            body = f"{ip[:1]}.{_digits(rng, 2, False)}E+{rng.between(2, 12):02d}"
+            body = "0.00E+00" if zero else f"{ip[:1]}.{_digits(rng, 2, False)}E+{rng.between(2, 12):02d}"
         else:
             sep = "," if base in ("thou_comma", "thou_comma_dec_dot", "comma_ambiguous") else \
                 "." if base in ("thou_dot", "thou_dot_dec_comma") else " " if base.startswith("thou_space") else ""

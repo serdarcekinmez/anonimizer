@@ -177,3 +177,41 @@ def test_synthetic_emails_use_reserved_domains(contracts):
     ds = generate(contracts["customers_hidden.csv"], 80, seed=4)
     emails = [c.text.strip() for c in _column(ds, "table_1", "c3") if c is not None and "@" in (c.text or "")]
     assert emails and all(e.split("@")[1] in ("example.com", "example.org", "example.net") for e in emails)
+
+
+# ASTRA-04: a zero in scientific notation is a zero, in scenarios and in ordinary rows.
+def _sci_contract(tmp_path, with_zero_rows=1):
+    from anonimizer.pipeline import profile_source
+    from anonimizer.recipe import ParseRecipe
+
+    vals = [f"{(i % 9) + 1}.{(i * 7) % 100:02d}E+{(i % 7) + 2:02d}" for i in range(50 - with_zero_rows)]
+    vals += ["0.00E+00"] * with_zero_rows
+    p = tmp_path / "sci.csv"
+    p.write_text("id,measure\n" + "".join(f"{i + 1},{v}\n" for i, v in enumerate(vals)), encoding="utf-8")
+    pol = get_policy("internal-dev")
+    _private, share = profile_source(str(p), ParseRecipe(), pol)
+    return str(p), build_contract(share, pol)
+
+
+def _is_zero(text):
+    return float(text) == 0.0
+
+
+def test_scientific_zero_scenario_is_zero(tmp_path):
+    _p, c = _sci_contract(tmp_path)
+    assert any(s["class"] == "numeric.zero" for s in c["tables"][0]["scenarios"])
+    for seed in range(8):
+        ds = generate(c, 50, seed=seed)
+        cells = _column(ds, "table_1", "c2")
+        zero_rows = [r for e in ds["manifest"] if e["class"] == "numeric.zero" for r in e["data_rows"]]
+        assert zero_rows, seed
+        for r in zero_rows:
+            assert _is_zero(cells[r - 1].text), (seed, r)
+
+
+def test_scientific_zero_in_ordinary_rows_is_zero(tmp_path):
+    _p, c = _sci_contract(tmp_path, with_zero_rows=15)  # common: also drawn in ordinary rows
+    ds = generate(c, 200, seed=4)
+    texts = [x.text for x in _column(ds, "table_1", "c2") if x is not None and x.text]
+    zeros = [t for t in texts if t.startswith("0.")]
+    assert zeros and all(_is_zero(t) for t in zeros)
