@@ -2,7 +2,7 @@
 
 Version 0.1.0, built on 2026-11-16 under the owner's product build directive. This page says what exists, how far each part goes, what was actually run, and what to do next. It replaces `phase-0-status.md` as the current status.
 
-**This is a working first increment, not a release.** It has had no independent review; the fixtures, the detector and the tests share one author. `tools/gate.py --release` fails by design because three high findings await the owner's decision.
+**This is a working first increment, not a release.** One independent review (2026-11-17, commit 6ae0e6a) reported six defects, ASTRA-01 to ASTRA-06; their fixes are on branch `fix/astra-review` and await re-review. Otherwise the fixtures, the detector and the tests share one author. `tools/gate.py --release` fails by design because three high findings await the owner's decision.
 
 ## What works
 

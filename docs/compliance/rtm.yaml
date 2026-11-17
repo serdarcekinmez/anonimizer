@@ -199,7 +199,7 @@ rows:
     requirement: CNIL-01
     basis: ANON-policy
     components: [profile, reports, export, cli, ui]
-    control: Shareable profile without row numbers or values; messages without cell contents; fresh-file export; runtime scan of reports for source values.
+    control: Shareable profile without row numbers or values; number formats reduced to layout codes (no literal text); messages without cell contents; fresh-file export; runtime scan of reports and output cell formats for source values and source number-format text.
     control_basis: ANON-policy
     kind: A+H
     status: partial

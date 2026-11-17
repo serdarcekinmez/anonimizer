@@ -41,6 +41,14 @@
 - Control characters cannot be stored in XLSX output.
 - At most one generated value per column and row can carry a scenario. Combinations of anomalies in the same cell are not generated.
 - The first data row is kept ordinary when the request leaves room for it.
+- Spreadsheet number formats are reduced to their layout codes before they reach the contract or the output: quoted text, escaped letters, padding, currency and locale tags, colours and conditions are dropped (`#,##0.00" EUR"` becomes `#,##0.00`, `[$-409]yyyy-mm-dd` becomes `yyyy-mm-dd`). A date format stays a date format. Letters that are format codes (y, m, d, h, s, e) are kept, so an unquoted word spelled only with them would pass; Excel stores other text quoted.
+- Key references: two unique columns with the same set of keys are read as one-to-one; the later table refers to the earlier one, and each parent key is used at most once. If the child table is given more rows than the parent has keys, the extra rows get keys that match no parent and the relationship is reported as not preserved. Reference cycles between tables and a reference inside one table are resolved after every table is generated.
+- Every declared reference is measured on the generated cells (containment, dangling keys that no scenario planned, repeated keys in a one-to-one reference). A broken one is a structural difference and withdraws full coverage.
+- Full coverage requires every covered cell-level case (missing kinds, type and storage mismatches, invalid dates, error values, zero, negative, leading zero, explicit plus, padding, line breaks, non-ASCII, control characters, formula-like text) to be present at its manifest location in the generated file. Cases that depend on the rest of the column (rare layouts and categories, outliers, format deviations, key roles) are only reported by the self-check. In very small outputs (about 5 rows) type and storage cases can disappear because the column's dominant type changes; they are then reported as not covered.
+
+## Output
+
+- An output directory must be new or empty. Nothing is overwritten: not the source file, not an earlier bundle, not a private profile or a source report. The bundle is written beside the target and moved into place in one step, so a failed run leaves no partial bundle. `contract -o` and `inspect --recipe-out` may replace an earlier file of the same name, never the input file.
 
 ## Privacy
 
@@ -49,7 +57,7 @@ See [privacy-limitations.md](privacy-limitations.md) and [threat-model.md](threa
 ## Interface
 
 - One user, one file, one session. State lives in memory and in a private temporary folder removed on exit.
-- Checked by server tests and by running the page script in an embedded JavaScript engine. Not yet exercised in a real browser by the developer.
+- Checked by server tests and by running the page script in an embedded JavaScript engine. The open, analyse, rename and apply steps were driven once in headless Chromium on 2026-11-17 (no layout or visual review); the rest of the page has not been exercised in a real browser.
 - No progress bar: analysing a file of several hundred megabytes shows "Analysing every cell" until it is done.
 - The local page shows the original cells of the opened file (source inspector, owner's requirement of 2026-11-16): a rectangle of at most 200 rows by 60 columns per request, 50 by 30 as shown, cells longer than 300 characters cut for display. Reaching a row far down a large file re-reads the file up to that row each time; there is no index. There is no search or filter.
 - Spreadsheet dates are shown as dates and booleans as TRUE/FALSE; other cells are shown as stored, not as a spreadsheet program would format them. Formulas are not shown, only their cached results.
@@ -57,7 +65,7 @@ See [privacy-limitations.md](privacy-limitations.md) and [threat-model.md](threa
 - Region highlights in the source view follow the applied table settings, not numbers typed but not yet applied.
 - The comparison under the generated preview shows the first 40 rows of the same sheet of the source. It is a side-by-side reading aid, not a row-by-row match.
 - "Confirmed by you" means that the table settings were applied with the confirm button. It records a user action; it does not check that the regions are right.
-- Bulk renaming works on the kept columns of one table (spelling, find and replace, prefix, suffix). There are no saved naming presets.
+- Renaming works on all kept columns of one table or on the ticked ones: edit the current names (spelling, find and replace, prefix, suffix), Alpha, Beta, Gamma …, or a list of names, one per selected column in table order, with a preview. The command line uses the same layer (`--names-*`, `--rename`). There are no saved naming presets. New names reach the dataset and the contract; the source report, the comparison and report.md still use the source's column names (finding F-004).
 - Columns are edited one at a time. Rules that link several columns of one row are not detected and not preserved; the only relationships found are single-column key references between tables.
 - The layout, the colours and the behaviour of the reorganised page (2026-11-16) were not seen in a real browser: no browser could be started in the development sandbox.
 
@@ -69,5 +77,5 @@ See [privacy-limitations.md](privacy-limitations.md) and [threat-model.md](threa
 
 ## Process
 
-- No independent review has taken place. The fixtures, the detector and the tests have the same author.
+- One independent review (2026-11-17, of commit 6ae0e6a) found six defects (ASTRA-01 to ASTRA-06); fixes are on branch `fix/astra-review`, awaiting re-review. Apart from that review, the fixtures, the detector and the tests have the same author.
 - `tools/gate.py --release` fails by design until the owner dispositions the open findings.
