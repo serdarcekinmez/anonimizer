@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import datetime as _dt
 import json
+import re
 
 from . import __version__
 from .patterns import BOOL_STYLES, DEFAULT_MARKERS, ERROR_CODES, safe_number_format
@@ -296,6 +297,117 @@ def _check_references(contract: dict) -> None:
             if target["key"]["role"] == "reference":
                 raise ContractError(f"{where} refers to {to}, which is itself a reference; point it at the key "
                                     f"column that {to} refers to")
+
+
+# -- column names -----------------------------------------------------------------------------
+# One naming layer for the interface and the command line: plan (a preview that changes
+# nothing), then apply. Messages name column ids and counts, never a column name.
+SEQUENCE_WORDS = ("Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa", "Lambda",
+                  "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega")
+NAMING_MODES = ("edit", "sequence", "list")
+NAMING_STYLES = ("", "snake", "lower", "upper")
+MAX_NAME = 300
+_SNAKE = re.compile(r"[\s!-/:-@\[-`{-~]+")
+
+
+def sequence_name(i: int) -> str:
+    """0 -> Alpha, 1 -> Beta, ... 23 -> Omega, 24 -> Alpha2."""
+    word = SEQUENCE_WORDS[i % len(SEQUENCE_WORDS)]
+    return word if i < len(SEQUENCE_WORDS) else f"{word}{i // len(SEQUENCE_WORDS) + 1}"
+
+
+def plan_names(columns: list[tuple[str, str]], *, mode: str = "edit", names: list[str] | None = None,
+               style: str = "", find: str = "", replace: str = "", prefix: str = "", suffix: str = "",
+               others: list[str] | tuple = ()) -> list[dict]:
+    """Propose new names for ``columns`` ((id, current name) pairs, in table order).
+
+    mode ``edit`` starts from the current names, ``sequence`` from Alpha, Beta, Gamma...,
+    ``list`` from ``names`` (one per column, in order; an empty entry keeps the current name).
+    Then, in this order: find/replace, spelling (``style``), prefix and suffix. ``others`` are
+    the names of the table's other kept columns: a new name may not repeat any of them.
+    """
+    if mode not in NAMING_MODES:
+        raise ContractError("unknown naming mode; use edit, sequence or list")
+    if style not in NAMING_STYLES:
+        raise ContractError("unknown spelling; use snake, lower or upper, or leave it empty")
+    if mode == "list":
+        names = [str(n).strip() for n in (names or [])]
+        if len(names) != len(columns):
+            raise ContractError(f"{len(names)} name(s) were given for {len(columns)} selected column(s); give exactly "
+                                f"one name per selected column, in table order (an empty line keeps a column's name)")
+    plan = []
+    for i, (cid, current) in enumerate(columns):
+        if mode == "sequence":
+            v = sequence_name(i)
+        elif mode == "list":
+            v = names[i] or current
+        else:
+            v = current
+        if mode == "list" and not names[i]:
+            plan.append({"id": cid, "current": current, "new": current, "changed": False})
+            continue
+        if find:
+            v = v.replace(find, replace)
+        if style == "snake":
+            v = _SNAKE.sub("_", v.strip().lower()).strip("_")
+        elif style == "lower":
+            v = v.lower()
+        elif style == "upper":
+            v = v.upper()
+        v = f"{prefix}{v}{suffix}"
+        plan.append({"id": cid, "current": current, "new": v, "changed": v != current})
+    empty = [p["id"] for p in plan if not p["new"].strip()]
+    if empty:
+        raise ContractError(f"the new name would be empty for column(s) {', '.join(empty)}")
+    long = [p["id"] for p in plan if len(p["new"]) > MAX_NAME]
+    if long:
+        raise ContractError(f"column names have at most {MAX_NAME} characters; too long for column(s) {', '.join(long)}")
+    seen: dict[str, str] = {}
+    clash = []
+    taken = set(others)
+    for p in plan:
+        if p["changed"] and (p["new"] in taken or p["new"] in seen):
+            clash.append(p["id"])
+        seen.setdefault(p["new"], p["id"])
+    if clash:
+        raise ContractError(f"the new names would repeat another column's name for column(s) {', '.join(clash)}")
+    return plan
+
+
+def apply_naming(contract: dict, spec: dict) -> list[dict]:
+    """Apply a naming request to the contract; returns the plan with the table of each column.
+
+    ``spec``: mode, names, style, find, replace, prefix, suffix as in ``plan_names``; ``columns``
+    a list of (table, column id or name) to rename, or ``table`` to rename every kept column of
+    one table, or neither for every kept column of every table (not for a list of names when the
+    contract has several tables).
+    """
+    opts = {k: spec[k] for k in ("mode", "names", "style", "find", "replace", "prefix", "suffix") if spec.get(k) is not None}
+    selected: dict[str, set] = {}
+    for table, column in spec.get("columns") or []:
+        col = find_column(contract, table, column)
+        if not col["keep"]:
+            raise ContractError(f"{table}.{col['id']} is not kept, so it has no output name to change")
+        selected.setdefault(table, set()).add(col["id"])
+    if spec.get("table") is not None and spec["table"] not in {t["name"] for t in contract["tables"]}:
+        raise ContractError("unknown table")
+    if selected:
+        tables = [t for t in contract["tables"] if t["name"] in selected]
+    else:
+        tables = [t for t in contract["tables"] if spec.get("table") in (None, t["name"])]
+    if opts.get("mode") == "list" and len(tables) > 1:
+        raise ContractError("a list of names applies to one table; choose the table or the columns")
+    plan_all = []
+    for t in tables:
+        kept = [c for c in t["columns"] if c["keep"]]
+        targets = [c for c in kept if c["id"] in selected[t["name"]]] if selected else kept
+        others = [c["name"] for c in kept if c not in targets]
+        plan = plan_names([(c["id"], c["name"]) for c in targets], others=others, **opts)
+        by_id = {c["id"]: c for c in targets}
+        for p in plan:
+            by_id[p["id"]]["name"] = p["new"]
+            plan_all.append({"table": t["name"], **p})
+    return plan_all
 
 
 # -- user decisions ---------------------------------------------------------------------------

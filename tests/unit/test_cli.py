@@ -207,3 +207,47 @@ def test_profile_outputs_never_replace_the_source(tmp_path, capsys):
     assert main(["profile", str(src), "--policy", "internal-dev", "--out", str(d)]) == 4
     assert src.read_bytes() == before
     capsys.readouterr()
+
+
+# ASTRA-05: naming from the command line, with a preview.
+def test_names_preview_prints_the_plan_and_writes_nothing(tmp_path, capsys):
+    out = tmp_path / "o"
+    code = main(["generate", product_path("customers_hidden.csv"), "--policy", "internal-dev", "-n", "5",
+                 "--out", str(out), "--names-sequence", "--names-for", "c1", "--names-for", "c3", "--names-preview"])
+    assert code == 0 and not out.exists()
+    printed = capsys.readouterr().out
+    assert "Alpha" in printed and "Beta" in printed and "2 column name(s) would change" in printed
+
+
+def test_names_list_file_renames_selected_columns_in_the_output(tmp_path, capsys):
+    names = tmp_path / "names.txt"
+    names.write_text("First\n\nThird\n", encoding="utf-8")
+    out = tmp_path / "o"
+    assert main(["generate", product_path("customers_hidden.csv"), "--policy", "internal-dev", "-n", "5",
+                 "--out", str(out), "--names-list", str(names), "--names-for", "c1", "--names-for", "c2",
+                 "--names-for", "c3", "--rename", "c4=Fourth"]) == 0
+    header = (out / "synthetic.csv").read_text(encoding="utf-8").splitlines()[0].split(",")
+    contract = json.loads((out / "contract.json").read_text(encoding="utf-8"))
+    original = [c["name"] for c in contract["tables"][0]["columns"]]
+    assert header[0] == "First" and header[2] == "Third" and header[3] == "Fourth" and header[1] == original[1]
+    capsys.readouterr()
+
+
+def test_names_list_length_mismatch_is_an_input_error(tmp_path, capsys):
+    names = tmp_path / "names.txt"
+    names.write_text("A\nB\n", encoding="utf-8")
+    assert main(["generate", product_path("customers_hidden.csv"), "--policy", "internal-dev", "-n", "5",
+                 "--out", str(tmp_path / "o"), "--names-list", str(names)]) == 2
+    err = capsys.readouterr().err
+    assert "2 name(s) were given for 10 selected column(s)" in err and not (tmp_path / "o").exists()
+
+
+def test_contract_command_applies_names_too(tmp_path, capsys):
+    cpath = tmp_path / "c.json"
+    assert main(["contract", product_path("orders_multi.tsv"), "--policy", "internal-dev", "-o", str(cpath),
+                 "--names-sequence", "--names-table", "table_2"]) == 0
+    c = json.loads(cpath.read_text(encoding="utf-8"))
+    t2 = next(t for t in c["tables"] if t["name"] == "table_2")
+    t1 = next(t for t in c["tables"] if t["name"] == "table_1")
+    assert t2["columns"][0]["name"] == "Alpha" and t1["columns"][0]["name"] != "Alpha"
+    capsys.readouterr()

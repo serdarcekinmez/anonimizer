@@ -103,7 +103,8 @@ def profile_source(path: str, recipe: ParseRecipe | None, policy: PrivacyPolicy)
 def apply_decisions(contract: dict, private_profile: dict, *, drop: list[tuple[str, str]] = (),
                     sensitivity: list[tuple[str, str, str]] = (), keep_categories: list[tuple[str, str]] = (),
                     approved_by: str | None = None, confirm_by: str | None = None,
-                    rename: list[tuple[str, str, str]] = ()) -> None:
+                    rename: list[tuple[str, str, str]] = (), naming: dict | None = None) -> list[dict]:
+    """Apply the user's decisions to the contract. Returns the naming plan (empty without naming)."""
     for table, column in drop:
         contract_mod.find_column(contract, table, column)["keep"] = False
     for table, column, cls in sensitivity:
@@ -114,8 +115,10 @@ def apply_decisions(contract: dict, private_profile: dict, *, drop: list[tuple[s
         contract_mod.approve_categories(contract, private_profile, table, column, approved_by or "")
     for table, column, new_name in rename:
         contract_mod.find_column(contract, table, column)["name"] = new_name
+    plan = contract_mod.apply_naming(contract, naming) if naming else []
     if confirm_by:
         contract_mod.confirm_contract(contract, confirm_by)
+    return plan
 
 
 def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, shareable: dict, contract: dict,
@@ -186,20 +189,29 @@ def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, s
     return result
 
 
-def run(path: str, *, policy_id: str, rows, seed=0, packing: str = "auto", recipe: ParseRecipe | None = None,
-        contract: dict | None = None, out_dir: str, **options) -> RunResult:
-    """One-shot Mode B run."""
+DECISIONS = ("drop", "sensitivity", "keep_categories", "approved_by", "confirm_by", "rename", "naming")
+
+
+def prepare_contract(path: str, *, policy_id: str, recipe: ParseRecipe | None = None, contract: dict | None = None,
+                     **decisions) -> tuple[dict, dict, dict, list]:
+    """Profile the source and return (private, shareable, contract with decisions, naming plan)."""
     policy = get_policy(policy_id)
-    recipe = recipe or ParseRecipe()
-    decisions = {k: options.pop(k) for k in ("drop", "sensitivity", "keep_categories", "approved_by", "confirm_by",
-                                              "rename") if k in options}
-    check_targets(path, out_dir, options.get("private_dir"))
-    private, shareable = profile_source(path, recipe, policy)
+    private, shareable = profile_source(path, recipe or ParseRecipe(), policy)
     if contract is None:
         contract = contract_mod.build_contract(shareable, policy)
     elif contract.get("policy", {}).get("id") != policy.id:
         raise contract_mod.ContractError("the contract was built under a different policy than the one selected")
-    if decisions:
-        apply_decisions(contract, private, **decisions)
+    plan = apply_decisions(contract, private, **decisions) if decisions else []
+    return private, shareable, contract, plan
+
+
+def run(path: str, *, policy_id: str, rows, seed=0, packing: str = "auto", recipe: ParseRecipe | None = None,
+        contract: dict | None = None, out_dir: str, **options) -> RunResult:
+    """One-shot Mode B run."""
+    recipe = recipe or ParseRecipe()
+    decisions = {k: options.pop(k) for k in DECISIONS if k in options}
+    check_targets(path, out_dir, options.get("private_dir"))
+    private, shareable, contract, _plan = prepare_contract(path, policy_id=policy_id, recipe=recipe, contract=contract,
+                                                           **decisions)
     return generate_and_export(path, recipe, private, shareable, contract, rows=rows, seed=seed, packing=packing,
                                out_dir=out_dir, **options)

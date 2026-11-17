@@ -135,3 +135,61 @@ def test_find_column_by_id_or_name(contract):
     assert find_column(contract, "table_1", "balance")["id"] == "c6"
     with pytest.raises(ContractError):
         find_column(contract, "table_1", "nope")
+
+
+# ASTRA-05: one naming layer for the interface and the command line.
+from anonimizer.contract import apply_naming, plan_names, sequence_name  # noqa: E402
+
+
+def test_sequence_names_continue_past_the_alphabet():
+    assert [sequence_name(i) for i in (0, 1, 2, 23, 24, 25)] == ["Alpha", "Beta", "Gamma", "Omega", "Alpha2", "Beta2"]
+
+
+def test_plan_names_modes_and_partial_lists():
+    cols = [("c1", "Customer Name"), ("c2", "Birth Date"), ("c3", "City")]
+    assert [p["new"] for p in plan_names(cols, mode="sequence")] == ["Alpha", "Beta", "Gamma"]
+    assert [p["new"] for p in plan_names(cols, mode="sequence", style="lower", prefix="col_")] == \
+        ["col_alpha", "col_beta", "col_gamma"]
+    assert [p["new"] for p in plan_names(cols, mode="list", names=["a", "", "  c  "])] == ["a", "Birth Date", "c"]
+    assert [p["new"] for p in plan_names(cols, mode="edit", style="snake")] == ["customer_name", "birth_date", "city"]
+    assert [p["new"] for p in plan_names(cols, mode="edit", find=" ", replace="-", style="upper")] == \
+        ["CUSTOMER-NAME", "BIRTH-DATE", "CITY"]
+    plan = plan_names(cols, mode="list", names=["x", "Birth Date", "z"])
+    assert [p["changed"] for p in plan] == [True, False, True]
+
+
+@pytest.mark.parametrize("kwargs,needle", [
+    ({"mode": "list", "names": ["a", "b"]}, "2 name(s) were given for 3 selected column(s)"),
+    ({"mode": "list", "names": ["a", "b", "c", "d"]}, "4 name(s) were given for 3 selected column(s)"),
+    ({"mode": "list", "names": ["a", "a", "b"]}, "would repeat"),
+    ({"mode": "list", "names": ["Other", "b", "c"]}, "would repeat"),
+    ({"mode": "edit", "find": "Name", "replace": "", "prefix": "", "style": ""}, None),
+    ({"mode": "list", "names": ["x" * 301, "b", "c"]}, "at most 300"),
+    ({"mode": "spell"}, "unknown naming mode"),
+    ({"mode": "edit", "style": "camel"}, "unknown spelling"),
+])
+def test_plan_names_rejects_with_a_clear_message(kwargs, needle):
+    cols = [("c1", "Customer Name"), ("c2", "Birth Date"), ("c3", "City")]
+    if needle is None:
+        assert plan_names(cols, others=["Other"], **kwargs)[0]["new"] == "Customer "
+        return
+    with pytest.raises(ContractError) as exc:
+        plan_names(cols, others=["Other"], **kwargs)
+    assert needle in str(exc.value)
+    assert "Customer" not in str(exc.value) and "Birth" not in str(exc.value)  # ids and counts only
+
+
+def test_apply_naming_on_selected_or_all_kept_columns(contract):
+    c = copy.deepcopy(contract)
+    c["tables"][0]["columns"][1]["keep"] = False
+    kept = [col for col in c["tables"][0]["columns"] if col["keep"]]
+    plan = apply_naming(c, {"columns": [("table_1", "c3"), ("table_1", "c1")], "mode": "list", "names": ["First", "Third"]})
+    assert [(p["id"], p["new"]) for p in plan] == [("c1", "First"), ("c3", "Third")]  # table order, not typing order
+    assert find_column(c, "table_1", "c1")["name"] == "First" and find_column(c, "table_1", "c3")["name"] == "Third"
+    plan = apply_naming(c, {"mode": "sequence"})
+    assert len(plan) == len(kept) and find_column(c, "table_1", "c1")["name"] == "Alpha"
+    assert find_column(c, "table_1", "c2")["name"] == contract["tables"][0]["columns"][1]["name"]  # not kept: untouched
+    with pytest.raises(ContractError) as exc:
+        apply_naming(c, {"columns": [("table_1", "c2")], "mode": "sequence"})
+    assert "not kept" in str(exc.value)
+    validate_contract(c)

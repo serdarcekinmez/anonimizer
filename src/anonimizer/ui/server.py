@@ -41,7 +41,7 @@ MAX_UPLOAD = 4 * 1024**3
 COOKIE = "anonimizer_session"
 SAMPLE_ROWS = 6
 # Raised whenever the page and the server stop understanding each other; app.js carries the same number.
-API_REVISION = 3
+API_REVISION = 4
 SAFE_NAME = re.compile(r"[^A-Za-z0-9._-]+")
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
        "form-action 'none'; frame-ancestors 'none'; base-uri 'none'")
@@ -195,6 +195,33 @@ class Session:
         self.contract = contract
         self.result = None
         return {"contract": self._contract_view()}
+
+    def names(self, body: dict) -> dict:
+        """Preview new column names with the shared naming layer. Changes nothing on the server.
+
+        The page sends the names currently in its fields (possibly not applied yet), the kept
+        columns of one table in table order, and optionally the ids of the selected columns.
+        """
+        if self.contract is None:
+            raise ApiError(409, "profile the file first")
+        cols = body.get("columns")
+        if not isinstance(cols, list) or not all(isinstance(c, dict) and isinstance(c.get("id"), str)
+                                                 and isinstance(c.get("name"), str) for c in cols):
+            raise ApiError(400, "malformed column list")
+        selected = body.get("selected")
+        if selected is not None and (not isinstance(selected, list) or not all(isinstance(x, str) for x in selected)):
+            raise ApiError(400, "malformed selection")
+        names = body.get("names")
+        if names is not None and (not isinstance(names, list) or not all(isinstance(x, str) for x in names)):
+            raise ApiError(400, "malformed list of names")
+        chosen = [c for c in cols if selected is None or c["id"] in selected]
+        if not chosen:
+            raise ApiError(400, "select at least one column")
+        others = [c["name"] for c in cols if c not in chosen]
+        opts = {k: str(body.get(k) or "") for k in ("style", "find", "replace", "prefix", "suffix")}
+        plan = contract_mod.plan_names([(c["id"], c["name"]) for c in chosen], mode=str(body.get("mode") or "edit"),
+                                       names=names, others=others, **opts)
+        return {"plan": plan}
 
     def generate(self, body: dict) -> dict:
         if self.contract is None:
@@ -382,7 +409,7 @@ class Handler(BaseHTTPRequestHandler):
                 body = self._body_json()
                 routes = {"/api/open": lambda: s.open_path(body.get("path")), "/api/recipe": lambda: s.set_recipe(body),
                           "/api/profile": lambda: s.profile(body), "/api/contract": lambda: s.decide(body),
-                          "/api/generate": lambda: s.generate(body), "/api/save": lambda: s.save_bundle(body),
+                          "/api/generate": lambda: s.generate(body), "/api/names": lambda: s.names(body), "/api/save": lambda: s.save_bundle(body),
                           "/api/sample": lambda: s.sample(body), "/api/source": lambda: s.source(body),
                           "/api/source/stats": lambda: s.source_stats(body)}
                 handler = routes.get(url.path)

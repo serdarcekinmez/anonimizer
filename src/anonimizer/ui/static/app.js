@@ -3,7 +3,7 @@
 // is inserted as text (never as HTML), so file contents cannot inject markup.
 
 const $ = (id) => document.getElementById(id);
-const API = 3;  // must equal API_REVISION of the server that delivered this page
+const API = 4;  // must equal API_REVISION of the server that delivered this page
 const PAGE_ROWS = 50;   // rows of the source shown at a time
 const PAGE_COLS = 30;
 const SOURCE_ROWS = 5;  // original rows shown above the synthetic sample in step 4
@@ -490,6 +490,7 @@ function selectColumn(tableName, columnId) {
   state.column = columnId;
   Object.entries(state.panels).forEach(([k, panel]) => { panel.hidden = k !== key(tableName, columnId === null ? "\u0001" : columnId); });
   drawSheet();
+  drawBulkColumns();
 }
 
 function currentTable() {
@@ -559,26 +560,81 @@ async function loadSample() {
   drawSheet();
 }
 
-function bulkRename(restore) {
+// Column naming: the server's naming layer (the same as the command line's) computes the
+// names; the page only previews them or fills them into the fields, to be applied as usual.
+function bulkColumns(t) {
+  const target = $("bulk-target").value;
+  const kept = t.columns.filter((c) => state.fields[key(t.name, c.id)].keep.checked);
+  const ticked = new Set(Array.from(document.querySelectorAll("#bulk-cols [data-col]")).filter((x) => x.checked).map((x) => x.dataset.col));
+  return { kept, selected: target === "selected" ? kept.filter((c) => ticked.has(c.id)).map((c) => c.id) : null };
+}
+
+function drawBulkColumns() {
+  const t = currentTable();
+  const box = $("bulk-cols");
+  const selecting = $("bulk-target").value === "selected";
+  box.hidden = !selecting || !t;
+  if (!t) return;
+  const ticked = new Set(Array.from(document.querySelectorAll("#bulk-cols [data-col]")).filter((x) => x.checked).map((x) => x.dataset.col));
+  if (box.dataset.table !== t.name) ticked.clear();  // a new table starts with nothing ticked
+  box.dataset.table = t.name;
+  box.replaceChildren(...t.columns.filter((c) => state.fields[key(t.name, c.id)].keep.checked).map((c) =>
+    el("label", {}, el("input", { type: "checkbox", "data-col": c.id, checked: ticked.has(c.id) }),
+      " " + (state.fields[key(t.name, c.id)].name.value || c.id))));
+}
+
+async function bulkPlan() {
+  const t = currentTable();
+  if (!t) return null;
+  const { kept, selected } = bulkColumns(t);
+  const mode = $("bulk-mode").value;
+  const body = {
+    table: t.name, mode, selected,
+    columns: kept.map((c) => ({ id: c.id, name: state.fields[key(t.name, c.id)].name.value })),
+    names: mode === "list" ? $("bulk-names").value.split(/\r?\n/).filter((x, i, a) => i < a.length - 1 || x !== "") : null,
+    style: $("bulk-style").value, find: $("bulk-find").value, replace: $("bulk-replace").value,
+    prefix: $("bulk-prefix").value, suffix: $("bulk-suffix").value,
+  };
+  try {
+    const data = await api("/api/names", body);
+    say("", "info");
+    return { t, plan: data.plan };
+  } catch (e) {
+    $("bulk-preview").replaceChildren();
+    say(e.message, "error");
+    return null;
+  }
+}
+
+async function bulkPreview() {
+  const res = await bulkPlan();
+  if (!res) return;
+  const changed = res.plan.filter((p) => p.changed).length;
+  $("bulk-preview").replaceChildren(
+    el("p", { class: "hint", text: changed + " of " + res.plan.length + " selected column(s) would change. Nothing is changed until you press \"Fill in the new names\" and then \"Apply decisions\"." }),
+    table(["Column", "Current name", "New name"], res.plan.map((p) => [p.id, p.current, p.new]), { scroll: true }));
+}
+
+async function bulkRename(restore) {
   const t = currentTable();
   if (!t) return;
-  const style = $("bulk-style").value;
-  const find = $("bulk-find").value;
   let changed = 0;
-  t.columns.forEach((c) => {
-    const f = state.fields[key(t.name, c.id)];
-    if (!f.keep.checked) return;
-    let v = restore ? c.name : f.name.value;
-    if (!restore) {
-      if (find) v = v.split(find).join($("bulk-replace").value);
-      if (style === "snake") v = v.trim().toLowerCase().replace(/[\s!-\/:-@\[-`{-~]+/g, "_").replace(/^_+|_+$/g, "");
-      else if (style === "lower") v = v.toLowerCase();
-      else if (style === "upper") v = v.toUpperCase();
-      v = $("bulk-prefix").value + v + $("bulk-suffix").value;
-    }
-    if (v && v !== f.name.value) { f.name.value = v; changed += 1; }
-  });
+  if (restore) {
+    t.columns.forEach((c) => {
+      const f = state.fields[key(t.name, c.id)];
+      if (f.keep.checked && f.name.value !== c.name) { f.name.value = c.name; changed += 1; }
+    });
+  } else {
+    const res = await bulkPlan();
+    if (!res) return;
+    res.plan.forEach((p) => {
+      const f = state.fields[key(t.name, p.id)];
+      if (p.new && p.new !== f.name.value) { f.name.value = p.new; changed += 1; }
+    });
+  }
+  $("bulk-preview").replaceChildren();
   if (changed) contractEdited(); else drawSheet();
+  drawBulkColumns();
   say(changed + " output name(s) of " + t.name + (restore ? " were set back to the applied names." : " were filled in.")
     + (changed ? " Press \"Apply decisions\" to use them." : ""), "info");
 }
@@ -738,6 +794,8 @@ async function init() {
   }));
   $("btn-bulk").addEventListener("click", () => bulkRename(false));
   $("btn-bulk-undo").addEventListener("click", () => bulkRename(true));
+  $("btn-bulk-preview").addEventListener("click", () => bulkPreview());
+  $("bulk-target").addEventListener("change", () => drawBulkColumns());
   $("btn-generate").addEventListener("click", () => busy($("btn-generate"), "Generating and assessing…", async () => {
     if (dirty.recipe) throw new Error("The table settings were changed but not applied. Apply them and analyse again before generating.");
     if (dirty.contract) throw new Error("The column settings have unapplied changes. Click 'Apply decisions' first; nothing was generated.");

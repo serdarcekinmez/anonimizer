@@ -231,12 +231,33 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     assert "Unapplied changes" in ctx.eval("__text('contract-state')")
     _click(ctx, "btn-generate")
     assert "unapplied changes" in ctx.eval("__text('msg')") and _hidden(ctx, "s-result") is True
+    # Selected columns get Greek-letter names after a preview; the others keep the bulk change.
+    ctx.eval("document.getElementById('bulk-style').value = ''; document.getElementById('bulk-prefix').value = '';"
+             "document.getElementById('bulk-mode').value = 'sequence'; document.getElementById('bulk-target').value = 'selected';"
+             "__fire('bulk-target', 'change')")
+    ctx.eval("document.querySelectorAll('#bulk-cols [data-col]').filter((x) => ['c2', 'c3'].includes(x.dataset.col))"
+             ".forEach((x) => { x.checked = true; })")
+    _click(ctx, "btn-bulk-preview")
+    preview = ctx.eval("__text('bulk-preview')")
+    assert "Alpha" in preview and "Beta" in preview and "2 of 2 selected column(s) would change" in preview
+    assert ctx.eval("state.fields['table_1\\u0000c2'].name.value") != "Alpha"  # a preview changes nothing
+    _click(ctx, "btn-bulk")
+    assert ctx.eval("state.fields['table_1\\u0000c2'].name.value") == "Alpha"
+    assert ctx.eval("state.fields['table_1\\u0000c3'].name.value") == "Beta"
+    # A list of the wrong length is refused with the counts, and nothing is filled in.
+    ctx.eval("document.getElementById('bulk-mode').value = 'list'; document.getElementById('bulk-names').value = 'one'")
+    _click(ctx, "btn-bulk")
+    assert "1 name(s) were given for 2 selected column(s)" in ctx.eval("__text('msg')")
+    assert ctx.eval("state.fields['table_1\\u0000c2'].name.value") == "Alpha"
+    ctx.eval("document.getElementById('bulk-target').value = 'all'; __fire('bulk-target', 'change');"
+             "document.getElementById('bulk-mode').value = 'edit'")
     # One column renamed by hand on top of the bulk change, then applied.
     ctx.eval("state.fields['table_1\\u0000c4'].name.value = 'qty'")
     _click(ctx, "btn-contract")
     assert ctx.eval("__text('msg')") == ""
     sheet = ctx.eval("__text('sheet')")
     assert "qty" in sheet and "x_AMOUNT_EUR" in sheet and "synthetic 1" in sheet and "null" not in sheet
+    assert "Alpha" in sheet and "Beta" in sheet
     ctx.eval("document.getElementById('rows').value = '25'; document.getElementById('seed').value = '2';"
              "document.getElementById('packing').value = 'auto'")
     _click(ctx, "btn-generate")

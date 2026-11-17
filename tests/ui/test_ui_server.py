@@ -301,3 +301,21 @@ def test_page_and_server_are_delivered_together(ui):
     assert f"const API = {json.loads(meta)['api']};" in script
     # The page is read when the server starts, so a running server never serves a newer page than its routes.
     assert server.RequestHandlerClass.static["app.js"] == script.encode("utf-8")
+
+
+def test_column_names_endpoint_previews_without_changing_anything(ui):
+    """ASTRA-05: the page asks the same naming layer as the command line for a preview."""
+    c, _server, session = ui
+    assert c.post("/api/open", {"path": product_path("customers_hidden.csv")})[0] == 200
+    assert c.post("/api/profile", {"policy": "internal-dev"})[0] == 200
+    cols = [{"id": "c1", "name": "a"}, {"id": "c2", "name": "b"}, {"id": "c3", "name": "c"}]
+    status, data = c.post("/api/names", {"table": "table_1", "columns": cols, "selected": ["c1", "c3"],
+                                         "mode": "sequence", "prefix": "f_"})
+    assert status == 200 and [(p["id"], p["new"]) for p in data["plan"]] == [("c1", "f_Alpha"), ("c3", "f_Beta")]
+    status, data = c.post("/api/names", {"table": "table_1", "columns": cols, "mode": "list", "names": ["x"]})
+    assert status == 400 and "1 name(s) were given for 3 selected column(s)" in data["error"]
+    status, data = c.post("/api/names", {"table": "table_1", "columns": cols, "mode": "list", "names": ["x", "y", "a"],
+                                         "selected": ["c2", "c3"]})
+    assert status == 400 and "2 selected column(s)" in data["error"]
+    # Nothing was applied: the contract keeps its names until the decisions are applied.
+    assert session.contract["tables"][0]["columns"][0]["name"] != "f_Alpha"

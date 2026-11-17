@@ -93,7 +93,18 @@
     <div id="table-tabs" class="tabs"></div>
     <div id="sheet" class="preview"></div>
     <div id="bulk" class="row bulk">
-      <strong>Rename all kept columns of this table:</strong>
+      <strong>Rename columns of this table:</strong>
+      <label for="bulk-target">Columns</label>
+      <select id="bulk-target" class="short">
+        <option value="all">all kept columns</option><option value="selected">only the columns ticked below</option>
+      </select>
+      <label for="bulk-mode">New names</label>
+      <select id="bulk-mode" class="short">
+        <option value="edit">edit the current names</option><option value="sequence">Alpha, Beta, Gamma, …</option><option value="list">my list of names</option>
+      </select>
+      <div id="bulk-cols" class="row" hidden></div>
+      <label for="bulk-names">Names, one per line, in column order (an empty line keeps a name)</label>
+      <textarea id="bulk-names" rows="4" cols="30" autocomplete="off"></textarea>
       <select id="bulk-style" class="short" aria-label="Spelling">
         <option value="">keep spelling</option><option value="snake">snake_case</option><option value="lower">lower case</option><option value="upper">UPPER CASE</option>
       </select>
@@ -101,9 +112,12 @@
       <label for="bulk-replace">Replace with</label><input id="bulk-replace" type="text" class="short" autocomplete="off">
       <label for="bulk-prefix">Prefix</label><input id="bulk-prefix" type="text" class="short" autocomplete="off">
       <label for="bulk-suffix">Suffix</label><input id="bulk-suffix" type="text" class="short" autocomplete="off">
+      <button id="btn-bulk-preview">Preview</button>
       <button id="btn-bulk">Fill in the new names</button>
       <button id="btn-bulk-undo">Restore the applied names</button>
     </div>
+    <p class="hint">New names are used in the generated dataset and in the contract. The source report, the comparison and report.md of the bundle still name the columns as in your file.</p>
+    <div id="bulk-preview"></div>
     <div id="contract"></div>
     <p class="hint">Each column is generated on its own. Rules that link several columns of one row (totals, date order, dependent codes) are not detected and not preserved.</p>
     <p id="review-note" class="hint"></p>

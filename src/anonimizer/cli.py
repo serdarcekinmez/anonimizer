@@ -49,6 +49,49 @@ def _split_ref(ref: str, tables: list[str]) -> tuple[str, str]:
     raise ContractError("column references must be written as TABLE.COLUMN; tables: " + ", ".join(tables))
 
 
+def _naming_decisions(args, tables: list[str]) -> dict:
+    """--rename and --names-* options as pipeline decisions (rename, naming)."""
+    out: dict = {}
+    renames = []
+    for item in args.rename or []:
+        ref, sep, new = item.partition("=")
+        if not sep or not new.strip():
+            raise ContractError("--rename expects TABLE.COLUMN=NEW_NAME")
+        renames.append((*_split_ref(ref, tables), new.strip()))
+    if renames:
+        out["rename"] = renames
+    edits = any(x for x in (args.names_style, args.names_find, args.names_prefix, args.names_suffix))
+    mode = "sequence" if args.names_sequence else "list" if args.names_list else "edit" if edits else None
+    if mode is None:
+        if args.names_for or args.names_table or args.names_preview:
+            raise ContractError("choose how to name the columns: --names-sequence, --names-list FILE, or one of "
+                                "--names-style, --names-find, --names-prefix, --names-suffix")
+        return out
+    names = None
+    if mode == "list":
+        try:
+            with open(args.names_list, encoding="utf-8-sig") as fh:
+                names = fh.read().splitlines()
+        except (OSError, UnicodeDecodeError):
+            raise ContractError("the names file cannot be read as UTF-8 text") from None
+    out["naming"] = {"mode": mode, "names": names, "style": args.names_style or "", "find": args.names_find or "",
+                     "replace": args.names_replace or "", "prefix": args.names_prefix or "",
+                     "suffix": args.names_suffix or "", "table": args.names_table,
+                     "columns": [_split_ref(x, tables) for x in args.names_for] if args.names_for else None}
+    return out
+
+
+def _print_naming_plan(plan: list[dict], preview: bool) -> None:
+    if not plan:
+        return
+    print("Column names" + (" (preview; nothing is written)" if preview else "") + ":")
+    for p in plan:
+        mark = "->" if p["changed"] else "=="
+        print(f"  {p['table']}.{p['id']:<5} {p['current'][:40]:<40} {mark} {p['new']}")
+    changed = sum(1 for p in plan if p["changed"])
+    print(f"{changed} column name(s) {'would change' if preview else 'changed'}.")
+
+
 def _print_regions(recipe: dict) -> None:
     print(f"{'name':<22} {'kind':<6} {'sheet':<16} {'header':>6} {'data rows':>15} {'columns':>9} {'conf':>5}  notes")
     for t in recipe["tables"]:
@@ -121,12 +164,16 @@ def cmd_profile(args) -> int:
 
 
 def cmd_contract(args) -> int:
-    from .pipeline import profile_source
+    from .pipeline import apply_decisions, profile_source
 
     _not_the_source(args.output, args.file)
     policy = get_policy(args.policy)
-    _private, shareable = profile_source(args.file, _recipe(args), policy)
+    private, shareable = profile_source(args.file, _recipe(args), policy)
     contract = build_contract(shareable, policy)
+    plan = apply_decisions(contract, private, **_naming_decisions(args, [t["name"] for t in contract["tables"]]))
+    _print_naming_plan(plan, args.names_preview)
+    if args.names_preview:
+        return EXIT_OK
     with open(args.output, "w", encoding="utf-8") as fh:
         fh.write(dumps(contract) + "\n")
     n_cols = sum(len(t["columns"]) for t in contract["tables"])
@@ -172,6 +219,13 @@ def cmd_generate(args) -> int:
         opts["approved_by"] = args.approved_by
     if args.confirm_contract:
         opts["confirm_by"] = args.confirm_contract
+    opts.update(_naming_decisions(args, names))
+    if args.names_preview:
+        from .pipeline import prepare_contract
+
+        _p, _s, _c, plan = prepare_contract(args.file, policy_id=policy.id, recipe=recipe, contract=contract, **opts)
+        _print_naming_plan(plan, True)
+        return EXIT_OK
     try:
         result = run(args.file, policy_id=policy.id, rows=rows, seed=args.seed, packing=args.packing, recipe=recipe,
                      contract=contract, out_dir=args.out, private_dir=args.private_dir, requested_tier=args.tier,
@@ -267,9 +321,29 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--private-dir", help="directory for the PRIVATE diagnostic profile")
     sp.set_defaults(func=cmd_profile)
 
+    def naming(sp):
+        g = sp.add_argument_group("column names", "Rename output columns. Without --names-for or --names-table every "
+                                  "kept column is renamed (a list of names needs one table). Columns are taken in "
+                                  "table order. New names reach the dataset and the contract; the source report, "
+                                  "comparison and report.md still use the source's column names.")
+        g.add_argument("--rename", action="append", metavar="TABLE.COLUMN=NAME", help="rename one column")
+        how = g.add_mutually_exclusive_group()
+        how.add_argument("--names-sequence", action="store_true", help="name the columns Alpha, Beta, Gamma, ...")
+        how.add_argument("--names-list", metavar="FILE", help="UTF-8 file, one name per line, one line per selected "
+                         "column; an empty line keeps that column's name")
+        g.add_argument("--names-for", action="append", metavar="TABLE.COLUMN", help="select a column to rename")
+        g.add_argument("--names-table", metavar="TABLE", help="rename the kept columns of this table only")
+        g.add_argument("--names-style", choices=["snake", "lower", "upper"], help="spelling applied to the names")
+        g.add_argument("--names-find", metavar="TEXT", help="text to replace in the names")
+        g.add_argument("--names-replace", metavar="TEXT", default="", help="replacement for --names-find")
+        g.add_argument("--names-prefix", metavar="TEXT", help="text put before every name")
+        g.add_argument("--names-suffix", metavar="TEXT", help="text put after every name")
+        g.add_argument("--names-preview", action="store_true", help="print the old and new names and stop")
+
     sp = sub.add_parser("contract", help="write a proposed Dataset Contract")
     common(sp)
     sp.add_argument("-o", "--output", required=True)
+    naming(sp)
     sp.set_defaults(func=cmd_contract)
 
     sp = sub.add_parser("generate", help="generate a synthetic test dataset (Mode B)")
@@ -291,6 +365,7 @@ def build_parser() -> argparse.ArgumentParser:
                     help="release tier to label the export with; refused if above the assessed tier")
     sp.add_argument("--private-dir", help="directory for the PRIVATE diagnostic profile")
     sp.add_argument("--skip-assessment", action="store_true", help="skip the privacy assessment (output is LOCAL_ONLY)")
+    naming(sp)
     sp.set_defaults(func=cmd_generate)
 
     sp = sub.add_parser("check-record", help="show the tier of an assessment record that is in force today")
