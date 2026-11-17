@@ -933,6 +933,7 @@ def _assign_keys(accs: list[TableAcc], tables: list[dict]) -> list[dict]:
             col["key"] = {"role": role, "confidence": conf, "references": None}
             if role == "unique":
                 uniques.append((acc, tab, j, col))
+    order = {id(t): i for i, t in enumerate(tables)}
     for acc, tab in zip(accs, tables):
         for j, col in enumerate(tab["columns"]):
             if col["n_values"] < 2 or col["logical_type"] not in ("integer", "digit_code", "text"):
@@ -954,6 +955,11 @@ def _assign_keys(accs: list[TableAcc], tables: list[dict]) -> list[dict]:
                 inside = sum(1 for h in child if h in parent)
                 if len(child) < 2 or inside / len(child) < 0.8:
                     continue
+                if col["key"]["role"] == "unique" and inside == len(child) == len(parent) \
+                        and order[id(utab)] > order[id(tab)]:
+                    # Two unique columns with the same key set: a one-to-one relationship. Only the
+                    # later table refers to the earlier one, so the pair never becomes a cycle.
+                    continue
                 dangling_rows = sum(c for h, c in child.items() if h not in parent)
                 cand = (inside / len(child), 1 if named else 0, utab["name"], ucol, len(child) - inside, dangling_rows)
                 if best is None or cand[:2] > best[:2]:
@@ -961,8 +967,11 @@ def _assign_keys(accs: list[TableAcc], tables: list[dict]) -> list[dict]:
             if best is None or col["key"]["role"] == "unique" and best[0] < 1.0:
                 continue
             containment, named, tname, ucol, dangling_vals, dangling_rows = best
+            refs = {"table": tname, "column": ucol["id"], "column_name": ucol["name"]}
+            if col["key"]["role"] == "unique":
+                refs["one_to_one"] = True  # each parent key is used at most once
             col["key"] = {"role": "reference", "confidence": round(0.5 + 0.3 * containment + 0.2 * named, 2),
-                          "references": {"table": tname, "column": ucol["id"], "column_name": ucol["name"]}}
+                          "references": refs}
             col.pop("categorical", None)
             relationships.append({"from_table": tab["name"], "from_column": col["id"], "from_column_name": col["name"],
                                   "to_table": tname, "to_column": ucol["id"], "to_column_name": ucol["name"],

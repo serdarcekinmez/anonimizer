@@ -269,7 +269,33 @@ def validate_contract(contract: dict) -> PrivacyPolicy:
             if col is not None:
                 allowed |= {str(v).casefold() for v in col["value_policy"].get("approved_literals", [])}
             _check_gen(sc.get("gen"), allowed, f"{tab['name']} scenario")
+    _check_references(contract)
     return policy
+
+
+def _check_references(contract: dict) -> None:
+    """A kept reference column must point at a kept key column (unique, repeating or none) of a
+    table in the contract. A reference to a dropped column or to another reference would be
+    generated without its parent and silently break the relationship."""
+    cols = {(t["name"], c["id"]): c for t in contract.get("tables", []) for c in t["columns"]}
+    for tab in contract.get("tables", []):
+        for col in tab["columns"]:
+            if not col["keep"] or col["key"]["role"] != "reference":
+                continue
+            where = f"{tab['name']}.{col['id']}"
+            ref = col["key"].get("references")
+            if not isinstance(ref, dict) or not isinstance(ref.get("table"), str) or not isinstance(ref.get("column"), str):
+                raise ContractError(f"{where}: a reference column must name the table and column it refers to")
+            target = cols.get((ref["table"], ref["column"]))
+            to = f"{ref['table']}.{ref['column']}" if target is not None else "an unknown table or column"
+            if target is None:
+                raise ContractError(f"{where} refers to {to}; set its key role to none or correct the reference")
+            if not target["keep"]:
+                raise ContractError(f"{where} refers to {to}, which is not kept; keep {to} as well, drop {where}, "
+                                    f"or set the key role of {where} to none")
+            if target["key"]["role"] == "reference":
+                raise ContractError(f"{where} refers to {to}, which is itself a reference; point it at the key "
+                                    f"column that {to} refers to")
 
 
 # -- user decisions ---------------------------------------------------------------------------

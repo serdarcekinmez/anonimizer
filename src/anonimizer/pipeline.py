@@ -46,6 +46,27 @@ class RunResult:
 PRIVATE_PROFILE_NAME = "source_profile.PRIVATE.json"
 
 
+def reconcile_coverage(coverage: dict, comparison: dict) -> None:
+    """Coverage states what the planner placed; it is full only if the generated file confirms it.
+
+    A declared relationship that does not hold in the generated cells is reported as not
+    represented, and full coverage is withdrawn.
+    """
+    by_table = {c["table"]: c for c in coverage["tables"]}
+    for r in comparison.get("relationship_verification", []):
+        if r["status"] != "broken":
+            continue
+        c = by_table.get(r["from_table"])
+        if c is None:
+            continue
+        c["uncovered"].append({"id": None, "class": "key.relationship", "column": r["from_column"],
+                               "description": f"reference to {r['to_table']}.{r['to_column_name']}",
+                               "reason": "not preserved in the generated cells"})
+        c["full_coverage"] = c["full_coverage_of_reproducible"] = False
+    coverage["full_coverage"] = all(c["full_coverage"] for c in coverage["tables"])
+    coverage["full_coverage_of_reproducible"] = all(c["full_coverage_of_reproducible"] for c in coverage["tables"])
+
+
 def check_targets(source: str, out_dir: str, private_dir: str | None = None) -> None:
     """Refuse, before any work, output locations that could replace the source or an earlier output."""
     check_output_dir(out_dir)
@@ -113,6 +134,7 @@ def generate_and_export(path: str, recipe: ParseRecipe, private_profile: dict, s
     generated_report["generation"] = dataset["params"]
     comparison = compare(shareable, out_profile, dataset, contract)
     coverage = dataset["coverage"]
+    reconcile_coverage(coverage, comparison)
     manifest = dataset["manifest"]
     recipe_doc = private_profile["recipe"]
     documents = {

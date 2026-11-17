@@ -39,6 +39,7 @@ class OutCell(NamedTuple):
 
 
 EMPTY_CELL = OutCell("", "")
+_PLACEHOLDER = "\x00deferred:"
 
 
 class Rng:
@@ -211,6 +212,11 @@ class _Col:
         self.pools: dict[int, list[OutCell]] = {}
         self.keypool: list[OutCell] = []
         self.parent_values: list[OutCell] | None = None
+        ref = spec["key"].get("references") or {}
+        self.one_to_one = self.role == "reference" and bool(ref.get("one_to_one"))
+        self.queue: list[OutCell] | None = None  # one-to-one: parent keys not yet used, in random order
+        self.deferred = False  # reference whose parent table is generated later (cycle or same table)
+        self.n_placeholders = 0
         self.reserved: set[str] = set()
         self.bump = 0
         self.values: list[OutCell] = []  # typical, non-missing values in generation order
@@ -228,6 +234,7 @@ class _TableGen:
             ref = c.spec["key"].get("references")
             if c.role == "reference" and ref:
                 c.parent_values = parents.get((ref["table"], ref["column"]))
+                c.deferred = c.parent_values is None
 
     # ---- value generation ---------------------------------------------------------------
     def value(self, g: dict, col: _Col, mods: dict | None = None) -> OutCell:
@@ -459,7 +466,11 @@ class _TableGen:
                 acc += rate
                 if u < acc:
                     return self.value(gen, col)
-        if col.role == "reference" and col.parent_values:
+        if col.role == "reference" and col.deferred:
+            v = self.placeholder(col, "ref")
+        elif col.one_to_one and col.parent_values:
+            v = self.next_unused_parent(col)
+        elif col.role == "reference" and col.parent_values:
             pool = [v for v in col.parent_values if v.text not in col.reserved] or col.parent_values
             v = rng.choice(pool)
         elif col.role == "repeating" and col.keypool:
@@ -471,6 +482,24 @@ class _TableGen:
         if v.kind != "" and v.text:
             col.values.append(v)
         return v
+
+    def next_unused_parent(self, col: _Col, rng: Rng | None = None) -> OutCell:
+        """One-to-one reference: each parent key once. Past the last key, a fresh unmatched key."""
+        if col.queue is None:
+            col.queue = [v for v in col.parent_values or [] if v.text not in col.reserved]
+            (rng or self.rng).shuffle(col.queue)
+        while col.queue:
+            v = col.queue.pop()
+            if v.text not in col.used:
+                col.used.add(v.text)
+                return v
+        return self.fresh(col, {v.text for v in col.parent_values or []})
+
+    @staticmethod
+    def placeholder(col: _Col, kind: str) -> OutCell:
+        """Stand-in for a reference resolved after its parent table exists (see _fill_deferred)."""
+        col.n_placeholders += 1
+        return OutCell(f"{_PLACEHOLDER}{kind}:{col.n_placeholders}", "s")
 
     def fresh(self, col: _Col, avoid: set | None = None) -> OutCell:
         """A value not used so far in this column (and not in ``avoid``)."""
@@ -657,12 +686,15 @@ def generate(contract: dict, rows, seed: int | str = 0, packing: str = "auto") -
     tables_out = {}
     manifest = []
     coverage_tables = []
+    deferred: list[_TableGen] = []
     for tab in _table_order(contract["tables"]):
         tg = _TableGen(tab, fmt, seed, parents)
         n = counts[tab["name"]]
         plan = plan_table(tab, n, packing)
         res = _generate_table(tg, tab, n, plan)
         tables_out[tab["name"]] = res["table"]
+        if any(c.deferred for c in tg.cols):
+            deferred.append(tg)
         manifest.extend(res["manifest"])
         for c in tg.cols:
             if c.role in ("unique", "none", "repeating"):
@@ -687,6 +719,8 @@ def generate(contract: dict, rows, seed: int | str = 0, packing: str = "auto") -
             "full_coverage": not unc,
             "full_coverage_of_reproducible": not plan["uncovered"] and not res["unsatisfied"],
         })
+    for tg in deferred:
+        _fill_deferred(tg, tables_out[tg.tab["name"]], parents, seed)
     order = [t["name"] for t in contract["tables"]]
     rng = Rng("anonimizer", GENERATOR_VERSION, seed, "__notes__")
     notes = {n["name"]: _note_rows(n["rows"], rng) for n in contract.get("notes", [])}
@@ -728,7 +762,9 @@ def _generate_table(tg: _TableGen, tab: dict, n: int, plan: dict) -> dict:
             if sc["gen"]["g"] != "key_multiplicity" or i != 0:
                 continue
             c = tg.by_id[cid]
-            if c.role == "reference" and c.parent_values:
+            if c.role == "reference" and c.deferred:
+                v = tg.placeholder(c, "group")
+            elif c.role == "reference" and c.parent_values:
                 free = [v for v in c.parent_values if v.text not in c.reserved]
                 if len(free) <= 1:
                     fail(sc, "the referenced table has too few generated key values to isolate this case")
@@ -808,7 +844,10 @@ def _generate_table(tg: _TableGen, tab: dict, n: int, plan: dict) -> dict:
                 cells.append(orig["cells"][cols.index(c)])
                 row["after"] = orig
             elif kind == "dangling_reference":
-                cells.append(tg.fresh(c, {v.text for v in (c.parent_values or [])}))
+                if c.deferred:
+                    cells.append(tg.placeholder(c, "dangling"))
+                else:
+                    cells.append(tg.fresh(c, {v.text for v in (c.parent_values or [])}))
             else:
                 v = tg.value(g, c, {"_scenario": True} if kind in ("number", "date") else None)
                 if c.role == "unique" and v.text:
@@ -872,6 +911,55 @@ def _generate_table(tg: _TableGen, tab: dict, n: int, plan: dict) -> dict:
         "manifest": manifest, "unsatisfied": unsatisfied,
         "n_data": len(data), "n_blank": len(blanks_sorted),
     }
+
+
+def _fill_deferred(tg: _TableGen, table: dict, parents: dict, seed) -> None:
+    """Resolve the placeholders of references whose parent table was generated after this one.
+
+    Generation goes table by table, parents first. A reference cycle (A refers to B, B to A) or
+    a reference inside one table leaves one side without parent keys while it is generated; its
+    cells are placeholders until every table exists. Groups (a key repeated k times) keep one
+    value per group, one-to-one references use each parent key once, dangling cases get a key
+    that is absent from the parent.
+    """
+    for c in tg.cols:
+        if not c.deferred:
+            continue
+        ref = c.spec["key"]["references"]
+        c.parent_values = parents.get((ref["table"], ref["column"])) or []
+        parent_texts = {v.text for v in c.parent_values}
+        rng = Rng("anonimizer", GENERATOR_VERSION, seed, tg.tab["name"], c.id, "__deferred__")
+        j = table["columns"].index(c.id)
+        seen: list[str] = []
+        for r in table["rows"]:
+            cells = r["cells"]
+            if r["kind"] == "data" and j < len(cells) and (cells[j].text or "").startswith(_PLACEHOLDER):
+                if cells[j].text not in seen:
+                    seen.append(cells[j].text)
+        mapping: dict[str, OutCell] = {}
+        groups = [t for t in seen if t.startswith(_PLACEHOLDER + "group:")]
+        free = [v for v in c.parent_values]
+        rng.shuffle(free)
+        for t in groups:
+            v = free.pop() if free else tg.fresh(c, parent_texts)
+            c.reserved.add(v.text)
+            mapping[t] = v
+        for t in seen:
+            if t in mapping:
+                continue
+            if t.startswith(_PLACEHOLDER + "dangling:"):
+                mapping[t] = tg.fresh(c, parent_texts)
+            elif not c.parent_values:
+                mapping[t] = tg.fresh(c)
+            elif c.one_to_one:
+                mapping[t] = tg.next_unused_parent(c, rng)
+            else:
+                pool = [v for v in c.parent_values if v.text not in c.reserved] or c.parent_values
+                mapping[t] = rng.choice(pool)
+        for r in table["rows"]:
+            cells = r["cells"]
+            if r["kind"] == "data" and j < len(cells) and cells[j].text in mapping:
+                cells[j] = mapping[cells[j].text]
 
 
 def _entry(tab: dict, sc: dict, col, data_rows: list, note: str | None = None, blank_after: int | None = None) -> dict:

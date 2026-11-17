@@ -75,6 +75,92 @@ def summarize_profile(profile: dict, role: str) -> dict:
     }
 
 
+def _missing_literals(gen, out: set) -> None:
+    if isinstance(gen, dict):
+        if gen.get("g") == "literal" and isinstance(gen.get("value"), str):
+            out.add(gen["value"])
+        for v in gen.values():
+            _missing_literals(v, out)
+    elif isinstance(gen, list):
+        for v in gen:
+            _missing_literals(v, out)
+
+
+def verify_relationships(contract: dict, dataset: dict) -> list[dict]:
+    """Measure every declared reference on the generated cells: containment, dangling rows and,
+    for one-to-one references, repeated keys. Counts only; no value is reported.
+
+    Cells that carry a planned exception of the column (a missing value, an error code, a
+    negative number...) are not keys and are left out. Dangling keys are expected only where the
+    Scenario Manifest planned a dangling-reference case.
+    """
+    tables = {t["name"]: t for t in contract["tables"]}
+    planned: dict = {}
+    for e in dataset["manifest"]:
+        if e.get("column") is not None:
+            kind = "dangling" if e["class"] == "key.dangling_reference" else \
+                "key" if e["class"].startswith("key.") else "exception"
+            for r in e["data_rows"]:
+                planned.setdefault((e["table"], e["column"], r), set()).add(kind)
+
+    def keys(tname, cid):
+        t = dataset["tables"].get(tname)
+        if t is None or cid not in t["columns"]:
+            return None
+        j = t["columns"].index(cid)
+        out = []
+        for r in t["rows"]:
+            if r["kind"] != "data":
+                continue
+            cell = r["cells"][j] if j < len(r["cells"]) else None
+            out.append((r["data_row"], None if cell is None or cell.kind == "" else cell.text))
+        return out
+
+    results = []
+    for tab in contract["tables"]:
+        for col in tab["columns"]:
+            ref = col["key"].get("references")
+            if not col["keep"] or col["key"]["role"] != "reference" or not ref:
+                continue
+            target = next((c for c in tables.get(ref["table"], {}).get("columns", []) if c["id"] == ref["column"]), None)
+            child = keys(tab["name"], col["id"])
+            parent = keys(ref["table"], ref["column"])
+            entry = {"from_table": tab["name"], "from_column": col["id"], "from_column_name": col["name"],
+                     "to_table": ref["table"], "to_column": ref["column"],
+                     "to_column_name": target["name"] if target else None,
+                     "one_to_one": bool(ref.get("one_to_one")), "key_cells": 0, "distinct_keys": 0,
+                     "containment": None, "dangling_rows": 0, "planned_dangling_rows": 0,
+                     "repeated_values": 0 if ref.get("one_to_one") else None, "status": "not_evaluable"}
+            results.append(entry)
+            if child is None or parent is None:
+                entry["status"] = "broken"
+                continue
+            skip: set = set()
+            _missing_literals(col.get("missing"), skip)
+            parent_set = {t for _r, t in parent if t}
+            counts: dict = {}
+            for data_row, text in child:
+                kinds = planned.get((tab["name"], col["id"], data_row), set())
+                if text is None or not text.strip() or text in skip or "exception" in kinds:
+                    continue
+                if "dangling" in kinds:
+                    entry["planned_dangling_rows"] += 1
+                    continue
+                entry["key_cells"] += 1
+                counts[text] = counts.get(text, 0) + 1
+                if text not in parent_set:
+                    entry["dangling_rows"] += 1
+            if not counts:
+                continue
+            entry["distinct_keys"] = len(counts)
+            entry["containment"] = round(sum(1 for t in counts if t in parent_set) / len(counts), 4)
+            if ref.get("one_to_one"):
+                entry["repeated_values"] = sum(n - 1 for n in counts.values())
+            broken = entry["dangling_rows"] > 0 or bool(entry["repeated_values"])
+            entry["status"] = "broken" if broken else "preserved"
+    return results
+
+
 def compare(src: dict, out: dict, dataset: dict, contract: dict) -> dict:
     """Compare the source profile with the profile of the generated file."""
     cov = {c["table"]: c for c in dataset["coverage"]["tables"]}
@@ -139,6 +225,16 @@ def compare(src: dict, out: dict, dataset: dict, contract: dict) -> dict:
         })
     if len(src["tables"]) != len(out["tables"]):
         structural.append(f"{len(src['tables'])} table(s) in the source, {len(out['tables'])} detected in the output")
+    relationships = verify_relationships(contract, dataset)
+    for r in relationships:
+        if r["status"] == "broken":
+            what = []
+            if r["dangling_rows"]:
+                what.append(f"{r['dangling_rows']} generated key(s) not found in the referenced column")
+            if r["repeated_values"]:
+                what.append(f"{r['repeated_values']} repeated key(s) in a one-to-one reference")
+            structural.append(f"relationship {r['from_table']}.{r['from_column_name']} -> {r['to_table']}."
+                              f"{r['to_column_name']} not preserved: " + ("; ".join(what) or "a column is missing"))
     s_file = {e["class"] for e in src["file_exceptions"]}
     o_file = {e["class"] for e in out["file_exceptions"]}
     return {
@@ -147,6 +243,7 @@ def compare(src: dict, out: dict, dataset: dict, contract: dict) -> dict:
         "file_level_classes_not_represented": sorted(s_file - o_file),
         "scenario_verification": {"covered_scenarios_found_again": verified,
                                   "covered_scenarios_not_found_again": unverified},
+        "relationship_verification": relationships,
         "statement": NON_CERTIFICATION_STATEMENT,
     }
 
@@ -249,6 +346,11 @@ def render_markdown(source: dict, generated: dict, comparison: dict, coverage: d
     sv = comparison["scenario_verification"]
     p.append(f"\nSelf-check: {sv['covered_scenarios_found_again']} covered scenario(s) were found again when the "
              f"generated file was profiled; {len(sv['covered_scenarios_not_found_again'])} were not.")
+    rel = comparison.get("relationship_verification") or []
+    if rel:
+        broken = sum(1 for r in rel if r["status"] == "broken")
+        p.append(f"\nRelationships between tables, measured on the generated cells: {len(rel) - broken} preserved, "
+                 f"{broken} not preserved.")
     if assessment:
         p.append("\n## Limitations\n")
         p += [f"- {x}" for x in assessment.get("limitations", [])]
