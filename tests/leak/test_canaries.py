@@ -117,3 +117,71 @@ def test_no_certification_or_anonymity_claim_in_outputs(name, tmp_path):
     for fname in ("report.md", "CLASSIFICATION.txt", "assessment_record.json", "release_label.json"):
         assert "not a certification" in texts[fname]
         assert "not proof that the data is legally anonymous" in texts[fname]
+
+
+# ASTRA-02: spreadsheet number formats can hold literal text ("0.00 \"Firm\"", "[$Firm-409]",
+# "0\F\i\r\m"). That text belongs to the source and must not reach any exported file, while
+# the layout part of the format (decimals, thousands, percent, date order) is kept.
+FORMAT_CANARIES = {
+    "number": ('#,##0.00" QZNUMCANARY"', "QZNUMCANARY"),
+    "currency": ('[$QZCURCANARY-409]#,##0.00', "QZCURCANARY"),
+    "escaped": ('0.0\\Q\\Z\\E\\S\\C\\C\\A\\N', "QZESCCAN"),
+    "date": ('yyyy-mm-dd" QZDATECANARY"', "QZDATECANARY"),
+    "percent": ('0.0%;[Red]"QZNEGCANARY "0.0%', "QZNEGCANARY"),
+}
+
+
+def _format_canary_workbook(path):
+    import datetime as dt
+
+    from openpyxl import Workbook
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Data"
+    names = list(FORMAT_CANARIES)
+    ws.append(["id", *names])
+    for i in range(1, 61):
+        values = [i * 1.25, i * 10.5, i + 0.5, dt.date(2024, 1, 1) + dt.timedelta(days=i), i / 200]
+        ws.append([i, *values])
+        for j, name in enumerate(names, start=2):
+            ws.cell(row=i + 1, column=j).number_format = FORMAT_CANARIES[name][0]
+    wb.save(path)
+
+
+@pytest.mark.cnil("ANON-01")
+@pytest.mark.cnil("ANON-03")
+def test_number_format_literals_reach_no_exported_file(tmp_path):
+    from anonimizer.contract import build_contract
+    from anonimizer.pipeline import profile_source
+    from anonimizer.policy import get_policy
+    from anonimizer.recipe import ParseRecipe
+
+    src = str(tmp_path / "formats.xlsx")
+    _format_canary_workbook(src)
+    pol = get_policy("internal-dev")
+    _private, share = profile_source(src, ParseRecipe(), pol)
+    contract = build_contract(share, pol)
+    confirm_all(contract)
+    out = str(tmp_path / "out")
+    res = run(src, policy_id="internal-dev", rows=30, seed=1, out_dir=out, contract=contract,
+              private_dir=str(tmp_path / "priv"))
+    texts = read_bundle_texts(out)
+    assert any("!xl/styles.xml" in n for n in texts) and "contract.json" in texts
+    for _fmt, canary in FORMAT_CANARIES.values():
+        for fname, text in texts.items():
+            assert canary not in text, f"number-format literal leaked into {fname}"
+    # The private diagnostic profile keeps the raw formats; it is local and not part of the bundle.
+    assert "QZNUMCANARY" in (tmp_path / "priv" / "source_profile.PRIVATE.json").read_text(encoding="utf-8")
+    assert res.assessment["criteria"]["source_leakage"]["status"] == "passed"
+    assert res.assessment["release_tier"] == "RESTRICTED"
+    # Supported formatting survives: thousands and decimals, percent, the date order.
+    from openpyxl import load_workbook
+
+    ws = load_workbook(os.path.join(out, "synthetic.xlsx")).active
+    header = [c.value for c in ws[1]]
+    formats = {name: {ws.cell(row=r, column=header.index(name) + 1).number_format for r in range(2, ws.max_row + 1)
+                      if ws.cell(row=r, column=header.index(name) + 1).data_type in ("n", "d")}
+               for name in FORMAT_CANARIES}
+    assert formats == {"number": {"#,##0.00"}, "currency": {"#,##0.00"}, "escaped": {"0.0"},
+                       "date": {"yyyy-mm-dd"}, "percent": {"0.0%;0.0%"}}

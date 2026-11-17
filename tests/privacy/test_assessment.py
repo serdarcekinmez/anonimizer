@@ -300,3 +300,38 @@ def test_no_reversal_material_in_the_bundle(tmp_path):
     assert manifest and all(max(e["data_rows"], default=0) <= 40 for e in manifest)  # generated rows only
     record = json.loads(texts["assessment_record.json"])
     assert record["information_flow"]["generator_inputs"] == ["Dataset Contract", "row counts", "seed"]
+
+
+@pytest.mark.cnil("ANON-03")
+def test_source_number_format_text_in_the_output_fails_source_leakage(tmp_path):
+    """ASTRA-02: literal text of a source number format, found in the output, fails the criterion."""
+    from openpyxl import Workbook
+
+    src = tmp_path / "fmt.xlsx"
+    wb = Workbook()
+    ws = wb.active
+    ws.append(["id", "amount"])
+    for i in range(1, 41):
+        ws.append([i, i * 2.5])
+        ws.cell(row=i + 1, column=2).number_format = '#,##0.00" QZLEAKFIRM"'
+    wb.save(src)
+    pol = get_policy("internal-dev")
+    private, share = profile_source(str(src), ParseRecipe(), pol)
+    contract = build_contract(share, pol)
+    col = contract["tables"][0]["columns"][1]
+    assert col["number_format"] == "#,##0.00"
+    clean = assess(str(src), ParseRecipe(), contract, generate(contract, 20, seed=1), private, pol,
+                   today=dt.date(2026, 11, 16))
+    leak = clean["criteria"]["source_leakage"]
+    assert leak["status"] == PASSED and leak["metrics"]["number_format_text_found"] == 0
+    # Planted: the raw format reaches the generator (validation bypassed) and a document.
+    forged = copy.deepcopy(contract)
+    forged["tables"][0]["columns"][1]["number_format"] = '#,##0.00" QZLEAKFIRM"'
+    bad = assess(str(src), ParseRecipe(), forged, generate(forged, 20, seed=1), private, pol,
+                 today=dt.date(2026, 11, 16))
+    assert bad["criteria"]["source_leakage"]["status"] == FAILED
+    assert bad["criteria"]["source_leakage"]["metrics"]["number_format_text_found"] >= 1
+    in_doc = assess(str(src), ParseRecipe(), contract, generate(contract, 20, seed=1), private, pol,
+                    artifacts={"notes.md": "format #,##0.00 QZLEAKFIRM"}, today=dt.date(2026, 11, 16))
+    assert in_doc["criteria"]["source_leakage"]["status"] == FAILED
+    assert "QZLEAKFIRM" not in json.dumps(bad) + json.dumps(in_doc)

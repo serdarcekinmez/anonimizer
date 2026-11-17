@@ -18,7 +18,7 @@ ALLOWED = {
     "grid": set(), "patterns": {"grid"}, "policy": set(), "regions": {"grid", "patterns"},
     "recipe": {"grid", "regions"}, "profile": {"grid", "patterns", "policy", "recipe", "regions"},
     "contract": {"patterns", "policy"}, "synth": {"patterns"},
-    "privacy": {"patterns", "policy", "recipe", "synth"}, "export": {"policy", "synth"},
+    "privacy": {"patterns", "policy", "recipe", "synth"}, "export": {"patterns", "policy", "synth"},
     "reports": {"contract", "profile"},
     "pipeline": {"contract", "export", "policy", "privacy", "profile", "recipe", "reports", "synth"},
     "cli": {"contract", "export", "grid", "policy", "recipe", "synth", "pipeline", "reports", "privacy", "ui"},

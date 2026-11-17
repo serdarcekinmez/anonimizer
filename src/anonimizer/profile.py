@@ -40,6 +40,7 @@ from .patterns import (
     bucket,
     classify,
     generalize_shape,
+    safe_number_format,
     shape_display,
     shape_of,
 )
@@ -1203,6 +1204,7 @@ def to_shareable(profile: dict, policy: PrivacyPolicy) -> dict:
     k = policy.small_count_threshold
     for tab in out["tables"]:
         for col in tab["columns"]:
+            _safe_formats(col)
             if "text" in col:
                 tg = _text_gen(col, policy)
                 col["base_gen"] = _fill_text(col["base_gen"], tg)
@@ -1237,6 +1239,31 @@ def to_shareable(profile: dict, policy: PrivacyPolicy) -> dict:
         else:
             ex["count_display"] = str(c)
     return out
+
+
+def _safe_formats(col: dict) -> None:
+    """Reduce every spreadsheet number format of a column to its layout codes (no literal text)."""
+    hist: dict = {}
+    for code, n in (col.get("number_formats") or {}).items():
+        safe = safe_number_format(code) or "General"
+        hist[safe] = hist.get(safe, 0) + n
+    if "number_formats" in col:
+        col["number_formats"] = dict(sorted(hist.items(), key=lambda kv: -kv[1]))
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, v in node.items():
+                if key == "number_format" and isinstance(v, str):
+                    node[key] = safe_number_format(v)
+                else:
+                    walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(col.get("base_gen"))
+    for ex in col.get("exceptions", []):
+        walk(ex.get("gen"))
 
 
 def _mask(n, k: int):

@@ -18,6 +18,7 @@ import tempfile
 import zipfile
 
 from . import NON_CERTIFICATION_STATEMENT, __version__
+from .patterns import safe_number_format
 from .policy import EXTERNAL_CANDIDATE, LOCAL_ONLY, RESTRICTED, TIER_ORDER
 
 _NEWLINES = {"lf": "\n", "crlf": "\r\n", "cr": "\r"}
@@ -197,8 +198,9 @@ def _xlsx_bytes(grids: dict[str, dict], layout: dict) -> bytes:
                 except ValueError:
                     target.value = text
                     target.data_type = "s"
-                if cell.fmt:
-                    target.number_format = cell.fmt
+                fmt = safe_number_format(cell.fmt)
+                if fmt:
+                    target.number_format = fmt
             elif cell.kind == "d":
                 try:
                     if "T" in text:
@@ -210,7 +212,7 @@ def _xlsx_bytes(grids: dict[str, dict], layout: dict) -> bytes:
                 except ValueError:
                     target.value = text
                     target.data_type = "s"
-                target.number_format = cell.fmt or ("yyyy-mm-dd hh:mm:ss" if "T" in text else
+                target.number_format = safe_number_format(cell.fmt) or ("yyyy-mm-dd hh:mm:ss" if "T" in text else
                                                     "hh:mm:ss" if ":" in text else "yyyy-mm-dd")
             elif cell.kind == "b":
                 target.value = text == "1"

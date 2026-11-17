@@ -327,6 +327,89 @@ def excel_serial_to_date(serial: float, date1904: bool = False) -> _dt.date | No
         return None
 
 
+# -- spreadsheet number formats ----------------------------------------------------------------
+# A number format can hold literal text: quoted strings, backslash-escaped characters, and
+# bracketed currency or locale tags. That text is part of the source file. Only layout codes
+# (digit placeholders, separators, date and time codes) may travel to a contract or an output.
+_FMT_PART = re.compile(r'"[^"]*"?|\\.|_.|\*.|\[[^\]]*\]?|.', re.S)
+_FMT_ELAPSED = re.compile(r"\[(?:h+|m+|s+)\]$", re.I)
+_FMT_WORDS = ("general", "am/pm", "a/p")
+_FMT_CHARS = frozenset("0#?,.%Ee+-/: ()$@yYmMdDhHsS;")
+_FMT_ESCAPED_OK = frozenset(" -/:().,+$")
+_FMT_CANONICAL = {"date": "yyyy-mm-dd", "time": "hh:mm:ss", "datetime": "yyyy-mm-dd hh:mm:ss"}
+
+
+def safe_number_format(code: str | None) -> str | None:
+    """Return the layout part of a spreadsheet number format; literal text is removed.
+
+    Kept: digit placeholders, thousands and decimal separators, percent, exponent, fraction,
+    date and time codes, elapsed-time brackets, General, AM/PM and section separators. Removed:
+    quoted text, escaped letters, padding and repeat characters, colour, condition, currency
+    and locale brackets. A date format stays a date format. ``None`` means "no format".
+    """
+    if code is None:
+        return None
+    from .grid.xlsx_reader import date_format_kind, is_date_format
+
+    s = str(code)
+    out: list[str] = []
+    i = 0
+    while i < len(s):
+        low = s[i:i + 8].lower()
+        word = next((w for w in _FMT_WORDS if low.startswith(w)), None)
+        if word:
+            out.append(s[i:i + len(word)])
+            i += len(word)
+            continue
+        tok = _FMT_PART.match(s, i).group()
+        i += len(tok)
+        if len(tok) == 1:
+            if tok in _FMT_CHARS:
+                out.append(tok)
+        elif tok[0] == "\\" and tok[1] in _FMT_ESCAPED_OK:
+            out.append(tok)
+        elif _FMT_ELAPSED.match(tok):
+            out.append(tok)
+    sections = "".join(out).split(";")
+    while sections and not sections[-1].strip():
+        sections.pop()
+    result = ";".join(sections)
+    if not result.strip(" ;,.-+/:()$\\"):
+        result = ""
+    if is_date_format(s) and not is_date_format(result):
+        return _FMT_CANONICAL[date_format_kind(s)]
+    if result and is_date_format(result) and not is_date_format(s):
+        return None
+    return result or None
+
+
+def format_literals(code: str | None) -> list[str]:
+    """The literal text parts of a number format (quoted, escaped runs, currency tags)."""
+    if not code:
+        return []
+    out: list[str] = []
+    run = ""
+    for m in _FMT_PART.finditer(str(code)):
+        tok = m.group()
+        if tok.startswith("\\") and len(tok) == 2:
+            run += tok[1]
+            continue
+        if run:
+            out.append(run)
+            run = ""
+        if tok.startswith('"'):
+            body = tok[1:-1] if tok.endswith('"') and len(tok) > 1 else tok[1:]
+            if body.strip():
+                out.append(body)
+        elif tok.startswith("[$"):
+            body = tok[2:].rstrip("]").split("-", 1)[0]
+            if body.strip():
+                out.append(body)
+    if run:
+        out.append(run)
+    return out
+
+
 def classify(raw: str | None, stype: str = "text", quoted: bool = False, number_format: str | None = None,
              markers: frozenset = DEFAULT_MARKERS, date1904: bool = False) -> V:
     if raw is None:

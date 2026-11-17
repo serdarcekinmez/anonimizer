@@ -12,7 +12,7 @@ import datetime as _dt
 import json
 
 from . import __version__
-from .patterns import BOOL_STYLES, DEFAULT_MARKERS, ERROR_CODES
+from .patterns import BOOL_STYLES, DEFAULT_MARKERS, ERROR_CODES, safe_number_format
 from .policy import PrivacyPolicy, get_policy
 
 CONTRACT_VERSION = 1
@@ -197,11 +197,20 @@ def _scenario(ex: dict) -> dict:
 
 
 # -- validation -------------------------------------------------------------------------------
+def _check_number_format(fmt, where: str) -> None:
+    if fmt is None:
+        return
+    if not isinstance(fmt, str) or safe_number_format(fmt) != fmt:
+        raise ContractError(f"{where}: a number format may hold layout codes only (digits, separators, date and "
+                            f"time codes); quoted text, escaped letters and bracketed tags are not accepted")
+
+
 def _check_gen(gen, allowed_literals: set, where: str) -> None:
     if gen is None:
         return
     if not isinstance(gen, dict) or gen.get("g") not in GEN_KINDS:
         raise ContractError(f"{where}: unknown generator")
+    _check_number_format(gen.get("number_format"), where)
     g = gen["g"]
     if g == "literal":
         v = gen.get("value")
@@ -247,6 +256,7 @@ def validate_contract(contract: dict) -> PrivacyPolicy:
                 raise ContractError(f"{where}: keep must be true or false")
             if not isinstance(col.get("name"), str) or len(col["name"]) > 300:
                 raise ContractError(f"{where}: column name must be a string of at most 300 characters")
+            _check_number_format(col.get("number_format"), where)
             allowed = set(DEFAULT_MARKERS) | extra | {str(v).casefold() for v in col["value_policy"].get("approved_literals", [])}
             _check_gen(col["base_gen"], allowed, where)
             for m in col["missing"]:

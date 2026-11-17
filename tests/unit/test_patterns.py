@@ -116,3 +116,36 @@ def test_shapes_never_contain_letters_or_digits_of_the_value():
     shown = shape_display(shape) + shape_display(generalize_shape(shape))
     assert "Wolf" not in shown and "77" not in shown and "QX" not in shown
     assert generalize_shape(shape_of("Pending"))[0][0] == "C"
+
+
+# ASTRA-02: number formats are reduced to their layout codes.
+@pytest.mark.parametrize("code,expected", [
+    ("General", "General"), ("0", "0"), ("0.00", "0.00"), ("#,##0.00", "#,##0.00"), ("0.00%", "0.00%"),
+    ("0.00E+00", "0.00E+00"), ("##0.0E+0", "##0.0E+0"), ("# ?/?", "# ?/?"), ("@", "@"),
+    ("mm-dd-yy", "mm-dd-yy"), ("d-mmm-yy", "d-mmm-yy"), ("h:mm AM/PM", "h:mm AM/PM"), ("[h]:mm:ss", "[h]:mm:ss"),
+    ("mmss.0", "mmss.0"), ("yyyy-mm-dd hh:mm:ss", "yyyy-mm-dd hh:mm:ss"),
+    ("#,##0 ;[Red](#,##0)", "#,##0 ;(#,##0)"), ("[$-409]yyyy-mm-dd", "yyyy-mm-dd"),
+    ('0.00" Firm"', "0.00"), ("[$Firm-409]#,##0", "#,##0"), ("0\\F\\i\\r\\m", "0"), ('_(0.00_)', "0.00"),
+    ('yyyy-mm-dd" Firm"', "yyyy-mm-dd"), ('[>=1000]0," Firm";0', "0,;0"), ('"Firm only"', None),
+    ('"Firm"yyyy', "yyyy"), ("**0", "0"), (None, None),
+])
+def test_safe_number_format(code, expected):
+    from anonimizer.patterns import safe_number_format
+
+    assert safe_number_format(code) == expected
+
+
+def test_safe_number_format_keeps_a_date_a_date():
+    from anonimizer.grid.xlsx_reader import is_date_format
+    from anonimizer.patterns import safe_number_format
+
+    for code in ('d"Firm"', 'yyyy\\-mm', "[$-F800]dddd, mmmm dd, yyyy", 'hh"h"mm'):
+        assert is_date_format(safe_number_format(code)), code
+    assert all(ch not in safe_number_format('[$-F800]dddd, mmmm dd, yyyy') for ch in "F$[]")
+
+
+def test_format_literals_lists_the_text_parts():
+    from anonimizer.patterns import format_literals
+
+    assert set(format_literals('[$Firm-409]#,##0.00" units";0\\N\\o\\n\\e')) == {"Firm", " units", "None"}
+    assert format_literals("#,##0.00") == []

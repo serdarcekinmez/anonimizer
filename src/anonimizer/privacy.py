@@ -17,7 +17,7 @@ import re
 from collections import Counter
 
 from . import NON_CERTIFICATION_STATEMENT, __version__
-from .patterns import BOOL_WORDS, DEFAULT_MARKERS, ERROR_CODES
+from .patterns import BOOL_WORDS, DEFAULT_MARKERS, ERROR_CODES, format_literals
 from .policy import (
     EXTERNAL_CANDIDATE,
     LOCAL_ONLY,
@@ -99,6 +99,37 @@ def _control_values(contract: dict, dataset: dict) -> dict[str, list[list[set]]]
                             sets[p].add(key)
             out.setdefault(name, []).append(sets)
     return out
+
+
+def _format_text_found(private_profile: dict, dataset: dict, tokens: set[str]) -> int:
+    """Count literal text parts of source number formats found in documents or output cell formats."""
+    literals: set[str] = set()
+
+    def walk(node):
+        if isinstance(node, dict):
+            for key, v in node.items():
+                if key == "number_format" and isinstance(v, str):
+                    literals.update(format_literals(v))
+                elif key == "number_formats" and isinstance(v, dict):
+                    for code in v:
+                        literals.update(format_literals(code))
+                else:
+                    walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+
+    walk(private_profile.get("tables", []))
+    probes = set()
+    for lit in literals:
+        if len(lit.strip()) >= 5:
+            probes.add(lit.strip())
+        probes.update(m.group() for m in _TOKEN.finditer(lit) if len(m.group()) >= 5)
+    if not probes:
+        return 0
+    out_formats = {cell.fmt for t in dataset["tables"].values() for r in t["rows"] if r["kind"] == "data"
+                   for cell in r["cells"] + r.get("extra", []) if getattr(cell, "fmt", None)}
+    return sum(1 for p in probes if p in tokens or any(p in f for f in out_formats))
 
 
 def _artifact_tokens(artifacts: dict[str, str]) -> set[str]:
@@ -408,7 +439,8 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
     else:
         i_status = PASSED
     private_keys = sum(1 for text in artifacts.values() if '"_private"' in text)
-    k_status = FAILED if artifact_hits or private_keys else PASSED
+    format_hits = _format_text_found(private_profile, dataset, tokens)
+    k_status = FAILED if artifact_hits or private_keys or format_hits else PASSED
     criteria = {
         "singling_out": {"status": s_status, "metrics": single,
                          "method": "closest source row per synthetic row on informative cells; replication of "
@@ -425,10 +457,13 @@ def assess(path: str, recipe: ParseRecipe, contract: dict, dataset: dict, privat
         "source_leakage": {"status": k_status,
                            "metrics": {"source_values_found_in_reports": artifact_hits,
                                        "documents_with_private_fields": private_keys,
+                                       "number_format_text_found": format_hits,
                                        "documents_scanned": sorted(artifacts),
                                        "other_columns_with_coincident_values": info_cols},
                            "method": "every source cell of five characters or more is looked up among the "
-                                     "strings of the exported reports, manifest and contract"},
+                                     "strings of the exported reports, manifest and contract; the literal text "
+                                     "parts of the source's number formats are looked up there and in the "
+                                     "number formats of the generated cells"},
     }
     status = FAILED if any(c["status"] == FAILED for c in criteria.values()) else PASSED
     tier, reasons = derive_tier(status, criteria, contract, policy, attestation)

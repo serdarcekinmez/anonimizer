@@ -73,6 +73,25 @@ def test_unapproved_literal_values_are_rejected(contract):
         validate_contract(c)
 
 
+@pytest.mark.cnil("ANON-03")
+def test_number_formats_with_literal_text_are_rejected(contract):
+    """ASTRA-02: an edited contract cannot carry text inside a number format to the output."""
+    for path, fmt in ((("number_format",), '0.00" Firm"'),
+                      (("base_gen", "number_format"), "[$Firm-409]yyyy-mm-dd")):
+        c = copy.deepcopy(contract)
+        col = c["tables"][0]["columns"][0]
+        target = col
+        for key in path[:-1]:
+            target = target[key]
+        target[path[-1]] = fmt
+        with pytest.raises(ContractError) as exc:
+            validate_contract(c)
+        assert "Firm" not in str(exc.value) and "number format" in str(exc.value)
+    c = copy.deepcopy(contract)
+    c["tables"][0]["columns"][0]["number_format"] = "#,##0.00"
+    validate_contract(c)
+
+
 @pytest.mark.cnil("CNIL-05")
 def test_category_approval_needs_a_person_and_respects_the_policy(contract, profiles):
     private = profiles["customers_hidden.csv"]
