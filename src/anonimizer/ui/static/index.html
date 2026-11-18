@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Anonimizer</title>
+<link rel="stylesheet" href="/static/app.css">
+</head>
+<body>
+<header>
+  <h1>Anonimizer</h1>
+  <p>Runs on this machine only. No file, value or report is sent anywhere.</p>
+</header>
+<nav id="steps" aria-label="Steps">
+  <a id="nav-s-file" class="st m1" href="#s-file"><b>1</b> Choose the file</a>
+  <a id="nav-s-regions" class="st m2 off" href="#s-regions"><b>2</b> Check the tables</a>
+  <a id="nav-s-policy" class="st m3 off" href="#s-policy"><b>3</b> Privacy policy</a>
+  <a id="nav-s-contract" class="st m4 off" href="#s-contract"><b>4</b> Columns</a>
+  <a id="nav-s-generate" class="st m5 off" href="#s-generate"><b>5</b> Generate and download</a>
+</nav>
+<div id="msg" role="status" aria-live="polite"></div>
+<main>
+  <section id="s-file" class="m1">
+    <h2><span class="step">1</span> Choose the file</h2>
+    <p class="hint">CSV, TSV or XLSX. Open it by path (nothing is copied), or pick it to copy it into a private temporary folder for this session.</p>
+    <div class="row">
+      <label for="path">Path</label>
+      <input id="path" type="text" placeholder="/path/to/file.csv" autocomplete="off" spellcheck="false">
+      <button id="btn-open" class="primary">Open</button>
+      <span class="or">or</span>
+      <input id="file" type="file" accept=".csv,.tsv,.txt,.tab,.xlsx,.xlsm">
+    </div>
+  </section>
+
+  <section id="s-glance" hidden>
+    <h2>Your file at a glance</h2>
+    <ul id="glance"></ul>
+  </section>
+
+  <section id="s-regions" class="m2" hidden>
+    <h2><span class="step">2</span> Check the tables found in your file</h2>
+    <p class="hint">Each card is a region the tool detected. A detection is a proposal: it becomes "confirmed by you" only when you press the confirm button below. Untick "Use" to leave a region out.</p>
+    <div id="region-cards" class="cards"></div>
+    <div id="source-box" class="preview">
+      <h3 id="source-title">Your file</h3>
+      <p class="hint">These are the original cells of your file, read on this machine for this page only. They are not written to any report, manifest or export. No privacy policy is needed to look at them.</p>
+      <div class="row">
+        <label for="src-sheet">Sheet</label><select id="src-sheet" class="short"></select>
+        <button id="src-region">Show the selected region</button>
+        <button id="src-top">Top of the sheet</button>
+        <button id="src-prev">Previous rows</button>
+        <button id="src-next">Next rows</button>
+        <label for="src-goto">Go to row</label><input id="src-goto" type="number" min="1" class="short"><button id="src-go">Go</button>
+        <button id="src-left">Columns to the left</button>
+        <button id="src-right">Columns to the right</button>
+      </div>
+      <div id="source-pos" class="facts"></div>
+      <div id="source"></div>
+      <div class="row">
+        <button id="btn-stats">Count exactly (reads the whole file)</button>
+        <span class="hint">Exact counts per column, computed and shown on this machine only.</span>
+      </div>
+      <div id="stats"></div>
+    </div>
+    <details id="regions-tech">
+      <summary>Technical details: row and column numbers, detection confidence, parsing options</summary>
+      <div id="file-facts" class="facts"></div>
+      <p class="hint">Rows and columns are numbered from 1, as in a spreadsheet. Correct a number, then confirm below.</p>
+      <div id="regions"></div>
+      <div class="row">
+        <label for="ov-delim">Delimiter</label><input id="ov-delim" type="text" class="short" placeholder="auto">
+        <label for="ov-enc">Encoding</label><input id="ov-enc" type="text" class="short" placeholder="auto">
+        <label for="ov-markers">Extra missing markers</label><input id="ov-markers" type="text" placeholder="comma-separated, e.g. s/o, vide">
+      </div>
+    </details>
+    <div class="row">
+      <button id="btn-recipe" class="primary">Confirm and apply these table settings</button>
+      <button id="btn-recipe-reset">Back to automatic detection</button>
+      <span id="recipe-state" class="hint"></span>
+    </div>
+  </section>
+
+  <section id="s-policy" class="m3" hidden>
+    <h2><span class="step">3</span> Choose a privacy policy and analyse</h2>
+    <p class="hint">A policy must be chosen; there is no default. It decides how rare patterns and small counts are generalised before anything is derived from the file.</p>
+    <div id="policies"></div>
+    <div class="row"><button id="btn-profile" class="primary">Analyse the file</button></div>
+  </section>
+
+  <section id="s-contract" class="m4" hidden>
+    <h2><span class="step">4</span> Columns: output names and generation settings</h2>
+    <p class="hint">Pick a table, then click a column heading to edit it. These are proposals; nothing changes until you press "Apply decisions".</p>
+    <div id="table-tabs" class="tabs"></div>
+    <div id="sheet" class="preview"></div>
+    <div id="bulk" class="row bulk">
+      <strong>Rename columns of this table:</strong>
+      <label for="bulk-target">Columns</label>
+      <select id="bulk-target" class="short">
+        <option value="all">all kept columns</option><option value="selected">only the columns ticked below</option>
+      </select>
+      <label for="bulk-mode">New names</label>
+      <select id="bulk-mode" class="short">
+        <option value="edit">edit the current names</option><option value="sequence">Alpha, Beta, Gamma, …</option><option value="list">my list of names</option>
+      </select>
+      <div id="bulk-cols" class="row" hidden></div>
+      <label for="bulk-names">Names, one per line, in column order (an empty line keeps a name)</label>
+      <textarea id="bulk-names" rows="4" cols="30" autocomplete="off"></textarea>
+      <select id="bulk-style" class="short" aria-label="Spelling">
+        <option value="">keep spelling</option><option value="snake">snake_case</option><option value="lower">lower case</option><option value="upper">UPPER CASE</option>
+      </select>
+      <label for="bulk-find">Find</label><input id="bulk-find" type="text" class="short" autocomplete="off">
+      <label for="bulk-replace">Replace with</label><input id="bulk-replace" type="text" class="short" autocomplete="off">
+      <label for="bulk-prefix">Prefix</label><input id="bulk-prefix" type="text" class="short" autocomplete="off">
+      <label for="bulk-suffix">Suffix</label><input id="bulk-suffix" type="text" class="short" autocomplete="off">
+      <button id="btn-bulk-preview">Preview</button>
+      <button id="btn-bulk">Fill in the new names</button>
+      <button id="btn-bulk-undo">Restore the applied names</button>
+    </div>
+    <p class="hint">New names are used in the generated dataset and in the contract. The source report, the comparison and report.md of the bundle still name the columns as in your file.</p>
+    <div id="bulk-preview"></div>
+    <div id="contract"></div>
+    <p class="hint">Each column is generated on its own. Rules that link several columns of one row (totals, date order, dependent codes) are not detected and not preserved.</p>
+    <p id="review-note" class="hint"></p>
+    <div class="row">
+      <label for="approved-by">Approver of copied category values</label><input id="approved-by" type="text" autocomplete="off">
+    </div>
+    <div class="row">
+      <label for="confirm-by">I reviewed these settings (name)</label><input id="confirm-by" type="text" autocomplete="off">
+      <span class="hint">Required for the RESTRICTED tier. Without it the output is LOCAL_ONLY.</span>
+    </div>
+    <div class="row"><button id="btn-contract" class="primary">Apply decisions</button><span id="contract-state" class="hint"></span></div>
+    <details id="s-report" hidden>
+      <summary>Technical details: full data-quality report and Exception Catalogue</summary>
+      <div id="report"></div>
+    </details>
+  </section>
+
+  <section id="s-generate" class="m5" hidden>
+    <h2><span class="step">5</span> Generate and download</h2>
+    <div id="gen-settings">
+      <div class="row">
+        <label for="rows">Synthetic rows</label><input id="rows" type="number" min="1" value="50" class="short">
+        <label for="seed">Seed</label><input id="seed" type="text" value="0" class="short">
+        <label for="packing">Scenario packing</label>
+        <select id="packing"><option value="auto">auto</option><option value="isolate">one scenario per row</option><option value="packed">pack as many as possible</option></select>
+      </div>
+      <div id="rows-for" class="row"></div>
+    </div>
+    <div class="row"><button id="btn-generate" class="primary big">Generate synthetic dataset</button><span id="generate-state" class="hint"></span></div>
+    <div id="s-result" hidden>
+      <div id="result"></div>
+      <details id="compare-box" open>
+        <summary>Compare with your file: the same area of the source (original values, shown locally only)</summary>
+        <div id="compare"></div>
+      </details>
+    </div>
+  </section>
+</main>
+<footer><p id="statement"></p><p id="version"></p></footer>
+<script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,1418 @@
+{
+  "tool_version": "0.1.0",
+  "rows": 60,
+  "seed": 1,
+  "results": [
+    {
+      "fixture": "customers_hidden.csv",
+      "planted_classes": 27,
+      "detected_exactly": 27,
+      "missed": [],
+      "count_mismatch": [],
+      "additional_findings": [
+        {
+          "table": "table_1",
+          "column": "notes",
+          "class": "category.rare_value",
+          "detected": 3
+        }
+      ],
+      "represented_in_anonimizer_output": 26,
+      "present_in_baseline_output": 1,
+      "rows": [
+        {
+          "table": "table_1",
+          "column": "(row)",
+          "class": "row.duplicate",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "(row)",
+          "class": "row.ragged_long",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "(row)",
+          "class": "row.ragged_short",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "balance",
+          "class": "format.number_deviation",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "balance",
+          "class": "missing.empty",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "balance",
+          "class": "missing.marker",
+          "planted": 4,
+          "detected": 4,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "balance",
+          "class": "numeric.negative",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "balance",
+          "class": "numeric.zero",
+          "planted": 4,
+          "detected": 4,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "balance",
+          "class": "type.text_in_number",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "country",
+          "class": "category.rare_value",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "country",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "country",
+          "class": "text.rare_pattern",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "customer_id",
+          "class": "key.duplicate",
+          "planted": 3,
+          "detected": 3,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "email",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "email",
+          "class": "text.padded",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "full_name",
+          "class": "text.rare_pattern",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "loyalty_points",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "loyalty_points",
+          "class": "missing.whitespace",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "loyalty_points",
+          "class": "type.text_in_number",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "notes",
+          "class": "missing.empty",
+          "planted": 4520,
+          "detected": 4520,
+          "in_anonimizer_output": true,
+          "in_baseline_output": true
+        },
+        {
+          "table": "table_1",
+          "column": "notes",
+          "class": "missing.quoted_empty",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "notes",
+          "class": "text.formula_like",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "notes",
+          "class": "text.multiline",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "notes",
+          "class": "text.rare_pattern",
+          "planted": 3,
+          "detected": 3,
+          "in_anonimizer_output": false,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "signup_date",
+          "class": "format.date_deviation",
+          "planted": 3,
+          "detected": 3,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "signup_date",
+          "class": "missing.empty",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "signup_date",
+          "class": "value.invalid_date",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        }
+      ],
+      "not_generated": {},
+      "baseline_errors": [],
+      "coverage": [
+        {
+          "table": "table_1",
+          "requested_rows": 60,
+          "generated_data_rows": 60,
+          "scenarios_total": 31,
+          "scenarios_covered": 31,
+          "n_min_isolated": 31,
+          "n_min_packed": 11
+        }
+      ],
+      "self_check": {
+        "covered_scenarios_found_again": 27,
+        "covered_scenarios_not_found_again": [
+          {
+            "id": "table_1/c10/category.rare_value",
+            "class": "category.rare_value",
+            "column": "c10",
+            "note": "generated, but the profiler did not classify it the same way in the small output"
+          },
+          {
+            "id": "table_1/c10/text.rare_pattern/=A{9-16}(\"a{3-4}:/{2}a{5-8}.a{3-4}\")",
+            "class": "text.rare_pattern",
+            "column": "c10",
+            "note": "generated, but the profiler did not classify it the same way in the small output"
+          },
+          {
+            "id": "table_1/c10/text.rare_pattern/A{5-8}-A{3-4}-9{3-4} a{3-4} a{3-4}",
+            "class": "text.rare_pattern",
+            "column": "c10",
+            "note": "generated, but the profiler did not classify it the same way in the small output"
+          },
+          {
+            "id": "table_1/c10/text.rare_pattern/C{5-8} a{3-4} a{5-8} a{3-4}",
+            "class": "text.rare_pattern",
+            "column": "c10",
+            "note": "generated, but the profiler did not classify it the same way in the small output"
+          }
+        ]
+      },
+      "assessment": {
+        "status": "passed",
+        "tier": "LOCAL_ONLY",
+        "criteria": {
+          "singling_out": "passed",
+          "linkability": "passed",
+          "inference": "passed",
+          "source_leakage": "passed"
+        }
+      },
+      "manifest_excerpt": [
+        {
+          "scenario": "row with more fields than the header (extra fields: 1)",
+          "column": "(row)",
+          "data_rows": [
+            2
+          ],
+          "where": [
+            {
+              "row": 3,
+              "line": 3
+            }
+          ]
+        },
+        {
+          "scenario": "value containing a line break",
+          "column": "notes",
+          "data_rows": [
+            7
+          ],
+          "where": [
+            {
+              "row": 8,
+              "line": 8,
+              "field": 10
+            }
+          ]
+        },
+        {
+          "scenario": "rare text layout (kind: code, pattern: =A{9-16}(\"a{3-4}:/{2}a{5-8}.a{3-4}\"))",
+          "column": "notes",
+          "data_rows": [
+            8
+          ],
+          "where": [
+            {
+              "row": 9,
+              "line": 10,
+              "field": 10
+            }
+          ]
+        },
+        {
+          "scenario": "date-shaped value that is not a real calendar date (format: Y-M-D)",
+          "column": "signup_date",
+          "data_rows": [
+            9
+          ],
+          "where": [
+            {
+              "row": 10,
+              "line": 11,
+              "field": 4
+            }
+          ]
+        },
+        {
+          "scenario": "rare text layout (kind: phrase, pattern: A{5-8}-A{3-4}-9{3-4} a{3-4} a{3-4})",
+          "column": "notes",
+          "data_rows": [
+            12
+          ],
+          "where": [
+            {
+              "row": 13,
+              "line": 14,
+              "field": 10
+            }
+          ]
+        },
+        {
+          "scenario": "literal missing-value marker (literal: null)",
+          "column": "email",
+          "data_rows": [
+            13
+          ],
+          "where": [
+            {
+              "row": 14,
+              "line": 15,
+              "field": 3
+            }
+          ]
+        },
+        {
+          "scenario": "cell holding only whitespace (length: 2)",
+          "column": "loyalty_points",
+          "data_rows": [
+            16
+          ],
+          "where": [
+            {
+              "row": 17,
+              "line": 18,
+              "field": 7
+            }
+          ]
+        },
+        {
+          "scenario": "literal missing-value marker (literal: UNKNOWN)",
+          "column": "country",
+          "data_rows": [
+            20
+          ],
+          "where": [
+            {
+              "row": 21,
+              "line": 22,
+              "field": 5
+            }
+          ]
+        },
+        {
+          "scenario": "negative number",
+          "column": "balance",
+          "data_rows": [
+            21
+          ],
+          "where": [
+            {
+              "row": 22,
+              "line": 23,
+              "field": 6
+            }
+          ]
+        },
+        {
+          "scenario": "rare text layout (kind: sentence, pattern: C{5-8} a{3-4} a{5-8} a{3-4})",
+          "column": "notes",
+          "data_rows": [
+            29
+          ],
+          "where": [
+            {
+              "row": 30,
+              "line": 31,
+              "field": 10
+            }
+          ]
+        },
+        {
+          "scenario": "empty cell",
+          "column": "signup_date",
+          "data_rows": [
+            30
+          ],
+          "where": [
+            {
+              "row": 31,
+              "line": 32,
+              "field": 4
+            }
+          ]
+        },
+        {
+          "scenario": "numeric zero (distinct from a missing value)",
+          "column": "balance",
+          "data_rows": [
+            31
+          ],
+          "where": [
+            {
+              "row": 32,
+              "line": 33,
+              "field": 6
+            }
+          ]
+        }
+      ],
+      "manifest_entries": 31,
+      "synthetic_sample": [
+        "customer_id | full_name | email | signup_date | country | balance | loyalty_points | status | last_contact | notes",
+        "777360 | Lutit Atema | cota.rimaju@example.org | 2021-09-08 | TO | 2691.01 | 625 | guzazi | 2024-12-20 | ",
+        "920871 | Abo Hececive | ijunovo.foluda@example.org | 2016-02-29 | ZU | 7562.42 | 1558 | azohipu | 2023-12-05 | Thagu iso e teriv imobafi | zajo",
+        "745715 | Sini Evedaru | ajek.onaza@example.com | 2022-02-27 | OS | 3638.59 | 1223 | azohipu | 2022-08-08 | ",
+        "627373 | Inohehag Ezekiza | emun.egaku@example.net | 2023-12-01 | TO | 6888.93 | 4234 | azohipu | 2022-04-22 | Hedah arin asaz",
+        "161908 | Olereze Uvekalec | imuholo.uzubof@example.org | 2017-04-30 | TE | 3557.45 | 7874 | azohipu | 2023-06-21 | ",
+        "372168 | Aredos Gumodag | bodoboc.gupahaz@example.com | 2015-04-21 | TE | 5326.76 | 558 | azohipu | 2023-03-28 | ",
+        "363143 | Ovapojo Iboma | pigeb.azak@example.net | 2015-04-25 | ZU | 3034.50 | 3991 | guzazi | 2024-02-06 | Bukob\\nnel u omebe kokunud",
+        "399106 | Sobehogu Imunu | baca.supelal@example.org | 2018-04-30 | TE | 9994.59 | 3217 | azohipu | 2022-06-17 | =OJOBELUGAZICELIG(\"ican://okusel.ifu\")",
+        "653505 | Fukoc Cevuna | izuve.tima@example.com | 2021-09-31 | HU | 41.92 | 7806 | azohipu | 2022-11-30 | Vubic afa t otohu rehucur",
+        "144450 | Lesos Katav | icedit.tevih@example.com | 2016-09-07 | TE | 1541.78 | 6394 | azohipu | 2023-01-18 | ",
+        "907387 | Ika Lopece | rinop.ovudur@example.net | 2016-01-18 | TE | 6960.70 | 8794 | azohipu | 2022-06-30 | Vubic afa t otohu rehucur"
+      ]
+    },
+    {
+      "fixture": "orders_multi.tsv",
+      "planted_classes": 20,
+      "detected_exactly": 20,
+      "missed": [],
+      "count_mismatch": [],
+      "additional_findings": [
+        {
+          "table": "table_1",
+          "column": "comment",
+          "class": "category.rare_value",
+          "detected": 1
+        }
+      ],
+      "represented_in_anonimizer_output": 20,
+      "present_in_baseline_output": 1,
+      "rows": [
+        {
+          "table": "table_1",
+          "column": "(row)",
+          "class": "row.blank_inside_table",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "(row)",
+          "class": "row.ragged_long",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "amount_eur",
+          "class": "format.number_deviation",
+          "planted": 3,
+          "detected": 3,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "amount_eur",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "amount_eur",
+          "class": "numeric.zero",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "comment",
+          "class": "missing.empty",
+          "planted": 1117,
+          "detected": 1117,
+          "in_anonimizer_output": true,
+          "in_baseline_output": true
+        },
+        {
+          "table": "table_1",
+          "column": "comment",
+          "class": "text.non_ascii",
+          "planted": 82,
+          "detected": 82,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "comment",
+          "class": "text.rare_pattern",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "customer_ref",
+          "class": "key.dangling_reference",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "customer_ref",
+          "class": "key.multiplicity",
+          "planted": 152,
+          "detected": 152,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "customer_ref",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "order_date",
+          "class": "format.date_deviation",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "order_date",
+          "class": "value.invalid_date",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "order_no",
+          "class": "text.padded",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "quantity",
+          "class": "missing.empty",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "quantity",
+          "class": "numeric.negative",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_1",
+          "column": "quantity",
+          "class": "type.text_in_number",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_2",
+          "column": "city",
+          "class": "missing.empty",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_2",
+          "column": "vip",
+          "class": "format.boolean_deviation",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "table_2",
+          "column": "vip",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        }
+      ],
+      "not_generated": {},
+      "baseline_errors": [],
+      "coverage": [
+        {
+          "table": "table_1",
+          "requested_rows": 60,
+          "generated_data_rows": 60,
+          "scenarios_total": 20,
+          "scenarios_covered": 20,
+          "n_min_isolated": 21,
+          "n_min_packed": 7
+        },
+        {
+          "table": "table_2",
+          "requested_rows": 60,
+          "generated_data_rows": 60,
+          "scenarios_total": 3,
+          "scenarios_covered": 3,
+          "n_min_isolated": 3,
+          "n_min_packed": 2
+        }
+      ],
+      "self_check": {
+        "covered_scenarios_found_again": 22,
+        "covered_scenarios_not_found_again": [
+          {
+            "id": "table_1/c7/category.rare_value",
+            "class": "category.rare_value",
+            "column": "c7",
+            "note": "generated, but the profiler did not classify it the same way in the small output"
+          }
+        ]
+      },
+      "assessment": {
+        "status": "passed",
+        "tier": "LOCAL_ONLY",
+        "criteria": {
+          "singling_out": "passed",
+          "linkability": "passed",
+          "inference": "passed",
+          "source_leakage": "passed"
+        }
+      },
+      "manifest_excerpt": [
+        {
+          "scenario": "blank row inside the table",
+          "column": "(row)",
+          "data_rows": [],
+          "where": [
+            {
+              "row": 54,
+              "line": 54
+            }
+          ]
+        },
+        {
+          "scenario": "numeric zero (distinct from a missing value)",
+          "column": "amount_eur",
+          "data_rows": [
+            3
+          ],
+          "where": [
+            {
+              "row": 7,
+              "line": 7,
+              "field": 5
+            }
+          ]
+        },
+        {
+          "scenario": "literal missing-value marker (literal: -)",
+          "column": "amount_eur",
+          "data_rows": [
+            8
+          ],
+          "where": [
+            {
+              "row": 12,
+              "line": 12,
+              "field": 5
+            }
+          ]
+        },
+        {
+          "scenario": "negative number",
+          "column": "quantity",
+          "data_rows": [
+            11
+          ],
+          "where": [
+            {
+              "row": 15,
+              "line": 15,
+              "field": 4
+            }
+          ]
+        },
+        {
+          "scenario": "empty cell",
+          "column": "comment",
+          "data_rows": [
+            17
+          ],
+          "where": [
+            {
+              "row": 21,
+              "line": 21,
+              "field": 7
+            }
+          ]
+        },
+        {
+          "scenario": "empty cell",
+          "column": "quantity",
+          "data_rows": [
+            18
+          ],
+          "where": [
+            {
+              "row": 22,
+              "line": 22,
+              "field": 4
+            }
+          ]
+        },
+        {
+          "scenario": "number written in a different format from the rest of the column (format: thou_dot_dec_comma)",
+          "column": "amount_eur",
+          "data_rows": [
+            19
+          ],
+          "where": [
+            {
+              "row": 23,
+              "line": 23,
+              "field": 5
+            }
+          ]
+        },
+        {
+          "scenario": "key value occurring a given number of times (occurrences per value: 3+)",
+          "column": "customer_ref",
+          "data_rows": [
+            22,
+            40,
+            44
+          ],
+          "where": [
+            {
+              "row": 26,
+              "line": 26,
+              "field": 2
+            },
+            {
+              "row": 44,
+              "line": 44,
+              "field": 2
+            },
+            {
+              "row": 48,
+              "line": 48,
+              "field": 2
+            }
+          ]
+        },
+        {
+          "scenario": "number written in a different format from the rest of the column (format: dec_comma|{n} €)",
+          "column": "amount_eur",
+          "data_rows": [
+            24
+          ],
+          "where": [
+            {
+              "row": 28,
+              "line": 28,
+              "field": 5
+            }
+          ]
+        },
+        {
+          "scenario": "row with more fields than the header (extra fields: 1)",
+          "column": "(row)",
+          "data_rows": [
+            25
+          ],
+          "where": [
+            {
+              "row": 29,
+              "line": 29
+            }
+          ]
+        },
+        {
+          "scenario": "value containing non-ASCII characters",
+          "column": "comment",
+          "data_rows": [
+            28
+          ],
+          "where": [
+            {
+              "row": 32,
+              "line": 32,
+              "field": 7
+            }
+          ]
+        },
+        {
+          "scenario": "key value occurring a given number of times (occurrences per value: 1)",
+          "column": "customer_ref",
+          "data_rows": [
+            33
+          ],
+          "where": [
+            {
+              "row": 37,
+              "line": 37,
+              "field": 2
+            }
+          ]
+        }
+      ],
+      "manifest_entries": 23,
+      "synthetic_sample": [
+        "Do consequat amet et magna sed veniam",
+        "Lorem ipsum tempor | Nisi ipsum laboris",
+        "",
+        "order_no | customer_ref | order_date | quantity | amount_eur | channel | comment",
+        "UPO-329569 | D-8085 | 29.09.2022 | 2 | 857,06 | enatu | ",
+        "LOR-625845 | U-4343 | 29.09.2022 | 7 | 5523,48 | ahe | ",
+        "EJE-858784 | A-4103 | 10.12.2022 | 61 | 0,00 | ahe | nikagalop cetaàkçi",
+        "EMI-994348 | B-1538 | 20.06.2023 | 18 | 3662,39 | ahe | ",
+        "VIT-363859 | U-9160 | 06.02.2022 | 36 | 4633,61 | enatu | ",
+        "KUD-604372 | E-6579 | 28.01.2023 | 81 | 8760,83 | ahe | ",
+        "PAN-358765 | O-6586 | 11.02.2023 | 98 | 5726,07 | enatu | ",
+        "ITE-207204 | V-0836 | 06.12.2023 | 3 | - | ahe | ogenir socñte"
+      ]
+    },
+    {
+      "fixture": "inventory_mixed.xlsx",
+      "planted_classes": 25,
+      "detected_exactly": 25,
+      "missed": [],
+      "count_mismatch": [],
+      "additional_findings": [],
+      "represented_in_anonimizer_output": 24,
+      "present_in_baseline_output": 0,
+      "rows": [
+        {
+          "table": "Stock#1",
+          "column": "active",
+          "class": "format.boolean_deviation",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "description",
+          "class": "category.rare_value",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "description",
+          "class": "text.rare_pattern",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "qty",
+          "class": "missing.empty",
+          "planted": 3,
+          "detected": 3,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "qty",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "qty",
+          "class": "numeric.zero",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "qty",
+          "class": "storage.number_as_text",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "qty",
+          "class": "xlsx.error_value",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "received",
+          "class": "missing.empty",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "received",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "received",
+          "class": "storage.date_as_text",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "received",
+          "class": "value.invalid_date",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "supplier_id",
+          "class": "key.dangling_reference",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "supplier_id",
+          "class": "key.multiplicity",
+          "planted": 41,
+          "detected": 41,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "total",
+          "class": "numeric.negative",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "total",
+          "class": "numeric.zero",
+          "planted": 4,
+          "detected": 4,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "total",
+          "class": "xlsx.error_value",
+          "planted": 3,
+          "detected": 3,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "total",
+          "class": "xlsx.formula_cell",
+          "planted": 400,
+          "detected": 400,
+          "in_anonimizer_output": false,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "unit_price",
+          "class": "format.number_deviation",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "unit_price",
+          "class": "numeric.negative",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Stock#1",
+          "column": "unit_price",
+          "class": "storage.number_as_text",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Suppliers",
+          "column": "(row)",
+          "class": "row.duplicate",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Suppliers",
+          "column": "rating",
+          "class": "missing.empty",
+          "planted": 2,
+          "detected": 2,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Suppliers",
+          "column": "rating",
+          "class": "missing.marker",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        },
+        {
+          "table": "Suppliers",
+          "column": "supplier_id",
+          "class": "key.duplicate",
+          "planted": 1,
+          "detected": 1,
+          "in_anonimizer_output": true,
+          "in_baseline_output": false
+        }
+      ],
+      "not_generated": {
+        "formulas are inventoried only; the generated cell holds a plain value": [
+          "cell computed by a formula"
+        ]
+      },
+      "baseline_errors": [],
+      "coverage": [
+        {
+          "table": "Stock#1",
+          "requested_rows": 60,
+          "generated_data_rows": 60,
+          "scenarios_total": 22,
+          "scenarios_covered": 21,
+          "n_min_isolated": 23,
+          "n_min_packed": 5
+        },
+        {
+          "table": "Stock#2",
+          "requested_rows": 4,
+          "generated_data_rows": 4,
+          "scenarios_total": 0,
+          "scenarios_covered": 0,
+          "n_min_isolated": 0,
+          "n_min_packed": 0
+        },
+        {
+          "table": "Suppliers",
+          "requested_rows": 41,
+          "generated_data_rows": 41,
+          "scenarios_total": 4,
+          "scenarios_covered": 4,
+          "n_min_isolated": 4,
+          "n_min_packed": 3
+        },
+        {
+          "table": "Archive",
+          "requested_rows": 3,
+          "generated_data_rows": 3,
+          "scenarios_total": 0,
+          "scenarios_covered": 0,
+          "n_min_isolated": 0,
+          "n_min_packed": 0
+        }
+      ],
+      "self_check": {
+        "covered_scenarios_found_again": 25,
+        "covered_scenarios_not_found_again": []
+      },
+      "assessment": {
+        "status": "passed",
+        "tier": "LOCAL_ONLY",
+        "criteria": {
+          "singling_out": "passed",
+          "linkability": "passed_with_residual_risk",
+          "inference": "passed",
+          "source_leakage": "passed"
+        }
+      },
+      "manifest_excerpt": [
+        {
+          "scenario": "key value occurring a given number of times (occurrences per value: 3+)",
+          "column": "supplier_id",
+          "data_rows": [
+            2,
+            21,
+            30
+          ],
+          "where": [
+            {
+              "row": 5,
+              "cell": "C5"
+            },
+            {
+              "row": 24,
+              "cell": "C24"
+            },
+            {
+              "row": 33,
+              "cell": "C33"
+            }
+          ]
+        },
+        {
+          "scenario": "spreadsheet error value (code: #VALUE!)",
+          "column": "total",
+          "data_rows": [
+            3
+          ],
+          "where": [
+            {
+              "row": 6,
+              "cell": "H6"
+            }
+          ]
+        },
+        {
+          "scenario": "boolean written in a different style (style: yes_no:lower)",
+          "column": "active",
+          "data_rows": [
+            6
+          ],
+          "where": [
+            {
+              "row": 9,
+              "cell": "G9"
+            }
+          ]
+        },
+        {
+          "scenario": "category value that occurs very rarely",
+          "column": "description",
+          "data_rows": [
+            9
+          ],
+          "where": [
+            {
+              "row": 12,
+              "cell": "B12"
+            }
+          ]
+        },
+        {
+          "scenario": "key value occurring a given number of times (occurrences per value: 1)",
+          "column": "supplier_id",
+          "data_rows": [
+            10
+          ],
+          "where": [
+            {
+              "row": 13,
+              "cell": "C13"
+            }
+          ]
+        },
+        {
+          "scenario": "empty cell",
+          "column": "received",
+          "data_rows": [
+            11
+          ],
+          "where": [
+            {
+              "row": 14,
+              "cell": "F14"
+            }
+          ]
+        },
+        {
+          "scenario": "spreadsheet error value (code: #N/A)",
+          "column": "qty",
+          "data_rows": [
+            15
+          ],
+          "where": [
+            {
+              "row": 18,
+              "cell": "D18"
+            }
+          ]
+        },
+        {
+          "scenario": "date stored as text in a date column",
+          "column": "received",
+          "data_rows": [
+            18
+          ],
+          "where": [
+            {
+              "row": 21,
+              "cell": "F21"
+            }
+          ]
+        },
+        {
+          "scenario": "number written in a different format from the rest of the column (format: dec_comma)",
+          "column": "unit_price",
+          "data_rows": [
+            20
+          ],
+          "where": [
+            {
+              "row": 23,
+              "cell": "E23"
+            }
+          ]
+        },
+        {
+          "scenario": "number stored as text in a numeric column",
+          "column": "qty",
+          "data_rows": [
+            24
+          ],
+          "where": [
+            {
+              "row": 27,
+              "cell": "D27"
+            }
+          ]
+        },
+        {
+          "scenario": "date-shaped value that is not a real calendar date (format: Y-M-D)",
+          "column": "received",
+          "data_rows": [
+            27
+          ],
+          "where": [
+            {
+              "row": 30,
+              "cell": "F30"
+            }
+          ]
+        },
+        {
+          "scenario": "literal missing-value marker (literal: TBD)",
+          "column": "qty",
+          "data_rows": [
+            28
+          ],
+          "where": [
+            {
+              "row": 31,
+              "cell": "D31"
+            }
+          ]
+        }
+      ],
+      "manifest_entries": 25,
+      "synthetic_sample": [
+        "Do consequat amet",
+        "sku | description | supplier_id | qty | unit_price | received | active | total |  |  | code | meaning",
+        "ETI-19753 | Cacetog nurez | 39 | 92 | 51.25 | 45015 | 1 | 24254.41 |  |  | A | Bekehemajib",
+        "UPU-56313 | Gbepul imehi | 64 | 530 | 852.5700000000001 | 44827 | 1 | 29722.46 |  |  | R | Jehipasanomotu",
+        "NOS-44719 | Gbepul imehi | 23 | 94 | 743 | 44776 | 1 | #VALUE! |  |  | L | Mimelipipej",
+        "EGI-81865 | Uuruzi otu | 23 | 216 | 11.22 | 44759 | 1 | 95079.03 |  |  | G | Lebogugecoteruli",
+        "ANU-25122 | Slejone acomu | 47 | 210 | 275.36 | 44381 | 1 | 845573.03",
+        "ZOC-76314 | Slejone acomu | 5 | 613 | 866.49 | 45271 | yes | 53192.84",
+        "AZU-95045 | Uuruzi otu | 47 | 863 | 561.78 | 44968 | 1 | 20224.32",
+        "EPA-29949 | Slejone acomu | 55 | 596 | 655.05 | 44476 | 1 | 92354.12",
+        "UNE-49509 | Oiluvu lekit | 67 | 974 | 745.3099999999999 | 45060 | 1 | 723526.6899999999",
+        "NOH-52424 | Vukeza leke | 24 | 275 | 641.6900000000001 | 44241 | 1 | 51303.53"
+      ]
+    }
+  ]
+}

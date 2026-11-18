@@ -1,0 +1,227 @@
+# Requirements Traceability Matrix. Checked by tools/check_rtm.py.
+# basis: CNIL-direct | CNIL-derived | ANON-policy     kind: A (automated) | H (human) | A+H
+# status: implemented | partial | planned | not_applicable
+# A row's automated tests are the tests carrying @pytest.mark.cnil("<row id>").
+version: 1
+scope: "Mode B (synthetic test data). Mode A rows are planned; no Mode A strategy is offered."
+rows:
+  - id: CNIL-01
+    requirement: CNIL-01
+    basis: CNIL-derived
+    components: [synth, export]
+    control: The generator receives the contract only. Exports carry no source row numbers, file names, paths or hashes.
+    control_basis: ANON-policy
+    kind: A
+    status: implemented
+    evidence: tests/privacy/test_assessment.py::test_no_reversal_material_in_the_bundle
+    notes: The seed and contract reproduce the output; they do not lead back to source records.
+  - id: CNIL-02
+    requirement: CNIL-02
+    basis: CNIL-direct
+    components: [policy, privacy, export]
+    control: Three-axis classification; tier derivation that can only lower the tier; export gate without override.
+    control_basis: ANON-policy
+    kind: A
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_tier_rules
+    notes: No pseudonymising transformation exists yet, so there is nothing to cap and no detector for stable one-to-one mappings.
+  - id: CNIL-03
+    requirement: CNIL-03
+    basis: CNIL-derived
+    components: [export, reports, ui, docs]
+    control: Fixed non-certification statement in every record, label and report; forbidden-claim lint in tools/scan_repo.py.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/leak/test_canaries.py::test_no_certification_or_anonymity_claim_in_outputs
+    notes: The automated part is in place. The observer's wording review (human) has not been run.
+  - id: CNIL-04
+    requirement: CNIL-04
+    basis: CNIL-derived
+    components: [contract]
+    control: Every column carries a keep decision; the contract records who confirmed it.
+    control_basis: ANON-policy
+    kind: A
+    status: partial
+    evidence: tests/unit/test_contract.py::test_every_column_carries_a_keep_decision_and_a_sensitivity_class
+    notes: Deviation from the Phase 3 acceptance wording (ADR 0002). Generation is not blocked without confirmation; the output is then LOCAL_ONLY.
+  - id: CNIL-05
+    requirement: CNIL-05
+    basis: CNIL-derived
+    components: [profile, policy, contract, synth]
+    control: No source value reaches the generator. Rare layouts are generalised; small counts are masked under the strict policy; category values are copied only on a person's approval and above the policy's limits.
+    control_basis: ANON-policy
+    kind: A
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_the_single_extreme_value_is_not_reproduced
+    notes: Under internal-dev exact small counts appear in reports. Numeric extremes are handled by digit count only.
+  - id: CNIL-06
+    requirement: CNIL-06
+    basis: CNIL-derived
+    components: [contract]
+    control: Confirmation is refused while a kept column is still unreviewed; dropping a column is an accepted decision.
+    control_basis: ANON-policy
+    kind: A
+    status: partial
+    evidence: tests/unit/test_contract.py::test_confirmation_requires_every_kept_column_to_be_reviewed
+    notes: Columns are proposed as kept, not dropped, until a person decides (ADR 0002). Unconfirmed output stays LOCAL_ONLY.
+  - id: CNIL-07
+    requirement: CNIL-07
+    basis: CNIL-derived
+    components: [policy, privacy]
+    control: The assessment record carries the full policy (layout threshold, year rounding, count masking) used for the run.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_record_contents
+    notes: Granularity is set per policy, not per quasi-identifier. Rationale review by a person is pending.
+  - id: CNIL-08
+    requirement: CNIL-08
+    basis: CNIL-direct
+    components: [transform]
+    control: Randomisation options for Mode A.
+    control_basis: ANON-policy
+    kind: A
+    status: planned
+    evidence: ""
+    notes: Mode A is not implemented and not offered.
+  - id: CNIL-09
+    requirement: CNIL-09
+    basis: CNIL-direct
+    components: [transform]
+    control: Generalisation hierarchies for Mode A.
+    control_basis: ANON-policy
+    kind: A
+    status: planned
+    evidence: ""
+    notes: Mode A is not implemented and not offered.
+  - id: CNIL-10
+    requirement: CNIL-10
+    basis: CNIL-direct
+    components: [privacy]
+    control: Closest source row per synthetic row on informative cells; equality with source rows; replication of source-unique quasi-identifier combinations.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_copied_source_rows_are_detected
+    notes: The metrics are this project's choice. No attack-based evaluation. Quasi-identifiers are a human designation.
+  - id: CNIL-11
+    requirement: CNIL-11
+    basis: CNIL-direct
+    components: [privacy]
+    control: Synthetic identifier values found in the source, compared with the same count for control datasets generated from the same contract with other seeds.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_copied_identifiers_are_detected
+    notes: No cross-release check and no check against an external register.
+  - id: CNIL-12
+    requirement: CNIL-12
+    basis: CNIL-direct
+    components: [synth, privacy]
+    control: Columns are generated independently from pattern classes; approved literal values on sensitive columns are recorded as residual risk.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_approved_literals_on_a_sensitive_column_leave_a_residual_statement
+    notes: By-construction argument; no homogeneity scan and no inference attack.
+  - id: CNIL-13
+    requirement: CNIL-13
+    basis: CNIL-direct
+    components: [privacy, docs]
+    control: Every criterion that is not fully met adds a residual-risk statement to the record; attacker assumptions come from the policy.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/privacy/test_assessment.py::test_record_contents
+    notes: Whether the residual risk is acceptable is the controller's judgment. The tool only records it.
+  - id: CNIL-14
+    requirement: CNIL-14
+    basis: CNIL-derived
+    components: [privacy, compliance docs]
+    control: Review-by date in every record; an expired record falls back to LOCAL_ONLY; source staleness check in tools/check_rtm.py.
+    control_basis: ANON-policy
+    kind: A+H
+    status: implemented
+    evidence: tests/privacy/test_assessment.py::test_expired_assessment_falls_back_to_local_only
+    notes: ""
+  - id: CNIL-15
+    requirement: CNIL-15
+    basis: CNIL-derived
+    components: [export, docs]
+    control: Local release register (what, when, tier, record id); incident procedure in docs/compliance/incident-procedure.md.
+    control_basis: ANON-policy
+    kind: A+H
+    status: implemented
+    evidence: tests/privacy/test_assessment.py::test_release_register_is_written
+    notes: The procedure has not been reviewed by the observer.
+  - id: CNIL-16
+    requirement: CNIL-16
+    basis: CNIL-direct
+    components: [policy, privacy, export]
+    control: The top tier needs an attestation by the controller and is unavailable in this release; the statement appears on every output.
+    control_basis: ANON-policy
+    kind: A+H
+    status: implemented
+    evidence: tests/privacy/test_assessment.py::test_tier_never_reaches_external_candidate_and_only_goes_down
+    notes: ""
+  - id: REF-WP216
+    requirement: REF-WP216
+    basis: CNIL-direct
+    components: [compliance docs]
+    control: Ingest WP216 with the same provenance procedure, then extend rows 08 to 13.
+    control_basis: ANON-policy
+    kind: H
+    status: planned
+    evidence: ""
+    notes: Finding F-002.
+  - id: ANON-01
+    requirement: CNIL-01
+    basis: ANON-policy
+    components: [synth, privacy]
+    control: Import rule (the generator cannot reach readers or files); canary suite over every exported file.
+    control_basis: ANON-policy
+    kind: A
+    status: implemented
+    evidence: tests/leak/test_canaries.py::test_no_source_value_in_any_exported_file
+    notes: ""
+  - id: ANON-02
+    requirement: CNIL-05
+    basis: ANON-policy
+    components: [profile, synth]
+    control: Unexpected text in typed columns is reproduced as a pattern class with a synthetic stand-in.
+    control_basis: ANON-policy
+    kind: A
+    status: implemented
+    evidence: tests/product/test_ground_truth.py::test_single_text_value_deep_in_a_numeric_column
+    notes: ""
+  - id: ANON-03
+    requirement: CNIL-01
+    basis: ANON-policy
+    components: [profile, reports, export, cli, ui]
+    control: Shareable profile without row numbers or values; number formats reduced to layout codes (no literal text); messages without cell contents; fresh-file export; runtime scan of reports and output cell formats for source values and source number-format text.
+    control_basis: ANON-policy
+    kind: A+H
+    status: partial
+    evidence: tests/leak/test_canaries.py::test_cli_output_and_errors_carry_no_source_value
+    notes: Column, sheet and table names are copied and need a person's review; that review is not enforced.
+  - id: ANON-04
+    requirement: CNIL-10
+    basis: ANON-policy
+    components: [skeleton]
+    control: No skeleton artifact is produced or exported (decision F9).
+    control_basis: ANON-policy
+    kind: A
+    status: not_applicable
+    evidence: ""
+    notes: The skeleton module of the architecture was not built.
+  - id: ANON-05
+    requirement: CNIL-14
+    basis: ANON-policy
+    components: [tools]
+    control: Privacy tests run in the full gate; this matrix is checked on every gate run.
+    control_basis: ANON-policy
+    kind: A
+    status: partial
+    evidence: tests/unit/test_tools.py::test_rtm_is_consistent
+    notes: The rule that a change under privacy paths must touch this file is not implemented.

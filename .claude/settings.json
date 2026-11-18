@@ -1,0 +1,73 @@
+{
+  "env": {
+    "CLAUDE_CODE_MAX_SUBAGENT_SPAWN_DEPTH": "1"
+  },
+  "permissions": {
+    "deny": [
+      "Read(//mnt/**)",
+      "Edit(//mnt/**)",
+      "Write(//mnt/**)"
+    ],
+    "ask": [
+      "Edit(/docs/compliance/cnil/**)",
+      "Write(/docs/compliance/cnil/**)",
+      "Edit(/docs/compliance/decisions/**)",
+      "Write(/docs/compliance/decisions/**)"
+    ],
+    "disableBypassPermissionsMode": "disable"
+  },
+  "sandbox": {
+    "enabled": true,
+    "failIfUnavailable": true,
+    "allowUnsandboxedCommands": false,
+    "filesystem": {
+      "denyRead": [
+        "/mnt",
+        "~/projects",
+        "~/.ssh",
+        "~/.aws",
+        "~/.gnupg",
+        "~/.config/gh",
+        "~/.netrc",
+        "~/.git-credentials"
+      ],
+      "allowRead": [
+        "."
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "pypi.org",
+        "files.pythonhosted.org",
+        "github.com",
+        "objects.githubusercontent.com",
+        "release-assets.githubusercontent.com",
+        "www.cnil.fr",
+        "json.schemastore.org"
+      ],
+      "allowLocalBinding": true
+    }
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Read|Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_paths.py\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PROJECT_DIR}/.claude/hooks/guard_commit.py\""
+          }
+        ]
+      }
+    ]
+  }
+}

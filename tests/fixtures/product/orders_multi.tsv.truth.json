@@ -1,0 +1,253 @@
+{
+  "fixture": "orders_multi.tsv",
+  "tables": [
+    {
+      "name": "table_1",
+      "rows": 1200,
+      "columns": 7,
+      "header_row": 4
+    },
+    {
+      "name": "table_2",
+      "rows": 150,
+      "columns": 5,
+      "header_row": 1208
+    }
+  ],
+  "relationships": [
+    {
+      "from": "table_1.customer_ref",
+      "to": "table_2.customer_code",
+      "dangling_rows": 2
+    }
+  ],
+  "canaries": [
+    "douze",
+    "ZZTOP-SECRET-4242"
+  ],
+  "anomalies": [
+    {
+      "table": "table_1",
+      "column": null,
+      "class": "row.blank_inside_table",
+      "count": 1,
+      "rows": [
+        605
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": null,
+      "class": "row.ragged_long",
+      "count": 1,
+      "rows": [
+        512
+      ],
+      "notes": [
+        "one trailing empty field"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "amount_eur",
+      "class": "format.number_deviation",
+      "count": 3,
+      "rows": [
+        309,
+        680,
+        943
+      ],
+      "notes": [
+        "thousands dot",
+        "currency suffix"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "amount_eur",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        133
+      ],
+      "notes": [
+        "-"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "amount_eur",
+      "class": "numeric.zero",
+      "count": 1,
+      "rows": [
+        22
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "comment",
+      "class": "missing.empty",
+      "count": 1117,
+      "rows": [],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "comment",
+      "class": "text.non_ascii",
+      "count": 82,
+      "rows": [],
+      "notes": [
+        "accented comments"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "comment",
+      "class": "text.rare_pattern",
+      "count": 1,
+      "rows": [
+        842
+      ],
+      "notes": [
+        "canary"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "customer_ref",
+      "class": "key.dangling_reference",
+      "count": 2,
+      "rows": [
+        1124,
+        296
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "customer_ref",
+      "class": "key.multiplicity",
+      "count": 152,
+      "rows": [],
+      "notes": [
+        "distinct reference values"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "customer_ref",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        249
+      ],
+      "notes": [
+        "n/a"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "order_date",
+      "class": "format.date_deviation",
+      "count": 2,
+      "rows": [
+        1162,
+        563
+      ],
+      "notes": [
+        "ISO date among dotted dates"
+      ]
+    },
+    {
+      "table": "table_1",
+      "column": "order_date",
+      "class": "value.invalid_date",
+      "count": 1,
+      "rows": [
+        551
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "order_no",
+      "class": "text.padded",
+      "count": 1,
+      "rows": [
+        697
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "quantity",
+      "class": "missing.empty",
+      "count": 1,
+      "rows": [
+        976
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "quantity",
+      "class": "numeric.negative",
+      "count": 1,
+      "rows": [
+        457
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_1",
+      "column": "quantity",
+      "class": "type.text_in_number",
+      "count": 1,
+      "rows": [
+        232
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_2",
+      "column": "city",
+      "class": "missing.empty",
+      "count": 1,
+      "rows": [
+        1221
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_2",
+      "column": "vip",
+      "class": "format.boolean_deviation",
+      "count": 1,
+      "rows": [
+        1246
+      ],
+      "notes": []
+    },
+    {
+      "table": "table_2",
+      "column": "vip",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        1299
+      ],
+      "notes": [
+        "?"
+      ]
+    }
+  ],
+  "file": {
+    "encoding": "cp1252",
+    "delimiter": "\t",
+    "newline": "crlf",
+    "notes": 2
+  }
+}

@@ -48,3 +48,27 @@ docs/compliance/cnil/snapshot/
 .vscode/
 .idea/
 .DS_Store
+
+# Placeholders that Claude Code's session sandbox shows inside the working directory to block
+# writes to them. They are not project files and cannot be added to git.
+/.bash_profile
+/.bashrc
+/.profile
+/.zprofile
+/.zshrc
+/.gitconfig
+/.gitmodules
+/.ripgreprc
+/.mcp.json
+/.idea
+/.vscode
+/.claude/commands
+/.claude/launch.json
+/.claude/loop.md
+/.claude/output-styles
+/.claude/routines
+/.claude/scheduled_tasks.json
+/.claude/workflows
+
+# machine-specific Windows launcher (names the local WSL distribution and path)
+Start-Anonimizer.cmd

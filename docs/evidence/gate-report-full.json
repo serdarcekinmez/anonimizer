@@ -1,0 +1,58 @@
+{
+  "mode": "full",
+  "passed": true,
+  "date": "2026-11-17",
+  "commit": "8cc0ac4",
+  "uncommitted_changes": false,
+  "python": "3.12.3",
+  "sandboxed": true,
+  "tests": {
+    "passed": 372,
+    "skipped": 6
+  },
+  "steps": [
+    {
+      "step": "lint",
+      "command": "-m ruff check src tests tools .claude",
+      "exit": 0,
+      "seconds": 0.0,
+      "tail": [
+        "All checks passed!"
+      ]
+    },
+    {
+      "step": "repository scan",
+      "command": "tools/scan_repo.py",
+      "exit": 0,
+      "seconds": 0.1,
+      "tail": [
+        "scan_repo: 140 file(s) scanned, 0 finding(s)"
+      ]
+    },
+    {
+      "step": "traceability matrix",
+      "command": "tools/check_rtm.py",
+      "exit": 0,
+      "seconds": 0.1,
+      "tail": [
+        "check_rtm: rows by status {'implemented': 6, 'partial': 12, 'planned': 3, 'not_applicable': 1}; 0 error(s), 0 warning(s)"
+      ]
+    },
+    {
+      "step": "tests",
+      "command": "-m pytest -q -p no:cacheprovider -rN tests",
+      "exit": 0,
+      "seconds": 45.1,
+      "tail": [
+        ".......s................................................................ [ 19%]",
+        "..........................................sssss......................... [ 38%]",
+        "........................................................................ [ 57%]",
+        "........................................................................ [ 76%]",
+        "........................................................................ [ 95%]",
+        "..................                                                       [100%]",
+        "372 passed, 6 skipped in 44.56s"
+      ]
+    }
+  ],
+  "statement": "A green gate means the listed controls behaved as specified on the listed fixtures. It is not a certification and not proof of legal anonymity."
+}

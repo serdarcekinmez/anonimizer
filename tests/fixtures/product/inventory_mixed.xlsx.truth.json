@@ -1,0 +1,326 @@
+{
+  "fixture": "inventory_mixed.xlsx",
+  "tables": [
+    {
+      "name": "Stock#1",
+      "rows": 400,
+      "columns": 8,
+      "header_row": 3
+    },
+    {
+      "name": "Stock#2",
+      "rows": 4,
+      "columns": 2,
+      "header_row": 3
+    },
+    {
+      "name": "Suppliers",
+      "rows": 41,
+      "columns": 4,
+      "header_row": 1
+    },
+    {
+      "name": "Archive",
+      "rows": 3,
+      "columns": 2,
+      "header_row": 1
+    }
+  ],
+  "relationships": [
+    {
+      "from": "Stock#1.supplier_id",
+      "to": "Suppliers.supplier_id",
+      "dangling_rows": 1
+    }
+  ],
+  "canaries": [
+    "Quuxinator Prototype-K9",
+    "Quuxinator",
+    "Prototype-K9"
+  ],
+  "anomalies": [
+    {
+      "table": "Stock#1",
+      "column": "active",
+      "class": "format.boolean_deviation",
+      "count": 1,
+      "rows": [
+        161
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "description",
+      "class": "category.rare_value",
+      "count": 1,
+      "rows": [],
+      "notes": [
+        "one description occurs once"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "description",
+      "class": "text.rare_pattern",
+      "count": 1,
+      "rows": [
+        75
+      ],
+      "notes": [
+        "canary"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "qty",
+      "class": "missing.empty",
+      "count": 3,
+      "rows": [
+        152,
+        186,
+        289
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "qty",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        308
+      ],
+      "notes": [
+        "TBD"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "qty",
+      "class": "numeric.zero",
+      "count": 1,
+      "rows": [
+        34
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "qty",
+      "class": "storage.number_as_text",
+      "count": 2,
+      "rows": [
+        242,
+        392
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "qty",
+      "class": "xlsx.error_value",
+      "count": 1,
+      "rows": [
+        202
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "received",
+      "class": "missing.empty",
+      "count": 2,
+      "rows": [
+        213,
+        321
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "received",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        294
+      ],
+      "notes": [
+        "unknown"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "received",
+      "class": "storage.date_as_text",
+      "count": 1,
+      "rows": [
+        332
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "received",
+      "class": "value.invalid_date",
+      "count": 1,
+      "rows": [
+        332
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "supplier_id",
+      "class": "key.dangling_reference",
+      "count": 1,
+      "rows": [
+        131
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "supplier_id",
+      "class": "key.multiplicity",
+      "count": 41,
+      "rows": [],
+      "notes": [
+        "distinct reference values"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "total",
+      "class": "numeric.negative",
+      "count": 1,
+      "rows": [
+        356
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "total",
+      "class": "numeric.zero",
+      "count": 4,
+      "rows": [
+        152,
+        186,
+        289,
+        34
+      ],
+      "notes": [
+        "formula over an empty cell"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "total",
+      "class": "xlsx.error_value",
+      "count": 3,
+      "rows": [
+        202,
+        308,
+        391
+      ],
+      "notes": [
+        "formula over a non-numeric cell"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "total",
+      "class": "xlsx.formula_cell",
+      "count": 400,
+      "rows": [],
+      "notes": [
+        "every total is a formula"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "unit_price",
+      "class": "format.number_deviation",
+      "count": 1,
+      "rows": [
+        391
+      ],
+      "notes": [
+        "decimal comma typed as text"
+      ]
+    },
+    {
+      "table": "Stock#1",
+      "column": "unit_price",
+      "class": "numeric.negative",
+      "count": 1,
+      "rows": [
+        356
+      ],
+      "notes": []
+    },
+    {
+      "table": "Stock#1",
+      "column": "unit_price",
+      "class": "storage.number_as_text",
+      "count": 1,
+      "rows": [
+        391
+      ],
+      "notes": []
+    },
+    {
+      "table": "Suppliers",
+      "column": null,
+      "class": "row.duplicate",
+      "count": 1,
+      "rows": [
+        42
+      ],
+      "notes": []
+    },
+    {
+      "table": "Suppliers",
+      "column": "rating",
+      "class": "missing.empty",
+      "count": 2,
+      "rows": [
+        8,
+        19
+      ],
+      "notes": []
+    },
+    {
+      "table": "Suppliers",
+      "column": "rating",
+      "class": "missing.marker",
+      "count": 1,
+      "rows": [
+        27
+      ],
+      "notes": [
+        "n/a"
+      ]
+    },
+    {
+      "table": "Suppliers",
+      "column": "supplier_id",
+      "class": "key.duplicate",
+      "count": 1,
+      "rows": [
+        42
+      ],
+      "notes": []
+    }
+  ],
+  "workbook": {
+    "hidden_sheets": 1,
+    "merged_ranges": 1,
+    "hidden_rows": 1,
+    "comments": true,
+    "defined_names": 1,
+    "author_metadata": true,
+    "formula_cells": 400
+  }
+}

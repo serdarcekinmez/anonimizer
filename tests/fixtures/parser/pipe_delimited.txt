@@ -1,0 +1,4 @@
+code|qty|note
+X1|4|ok
+X2|9|late
+X3|1|ok

@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "anonimizer"
+version = "0.1.0"
+description = "Local, offline discovery of data-quality anomalies in CSV/XLSX files and generation of synthetic test datasets that preserve them."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary - all rights reserved" }
+dependencies = ["openpyxl>=3.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "hypothesis>=6.100", "ruff>=0.6", "pyyaml>=6", "quickjs>=1.19"]
+
+[project.scripts]
+anonimizer = "anonimizer.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/anonimizer"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:cacheprovider"
+markers = [
+  "cnil(id): links a test to a row of docs/compliance/rtm.yaml",
+  "slow: large-file performance checks (run with --runslow)",
+]
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+src = ["src", "tests", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S110", "PLE"]
+ignore = ["E501", "B905", "UP007", "UP045"]
