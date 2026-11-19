@@ -5,7 +5,7 @@ body { margin:0; font:14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif
 header { padding:18px 28px 10px; background:var(--card); border-bottom:1px solid var(--line); }
 header h1 { margin:0; font-size:22px; }
 header p { margin:4px 0 0; color:var(--muted); }
-main { max-width:1280px; margin:0 auto; padding:16px 20px 40px; }
+main { max-width:1400px; margin:0 auto; padding:16px 20px 40px; }
 section { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:14px 18px; margin:14px 0; }
 h2 { margin:0 0 8px; font-size:17px; }
 h3 { margin:16px 0 6px; font-size:15px; }
@@ -20,7 +20,6 @@ input.short, select.short { min-width:0; width:110px; }
 td input[type=text], td input[type=number], td select { min-width:0; width:100%; padding:3px 5px; }
 td input.num { width:76px; }
 button { padding:6px 12px; border:1px solid var(--line); border-radius:5px; background:#fff; font:inherit; cursor:pointer; color:var(--ink); }
-button.primary { background:var(--m, var(--accent)); border-color:var(--m, var(--accent)); color:#fff; }
 button:disabled { opacity:.55; cursor:default; }
 table { border-collapse:collapse; width:100%; margin:6px 0 10px; font-size:13px; }
 th, td { border:1px solid var(--line); padding:4px 7px; text-align:left; vertical-align:top; }
@@ -55,28 +54,73 @@ a { color:var(--accent); }
 .low { color:var(--warn); font-weight:600; }
 
 /* One colour per mission, used for the step list, the section edge, its heading and its main button.
-   The number and the title carry the same information, so colour is never the only cue. */
-.m1 { --m:#1d5fbf; --mbg:#eaf2ff; }  /* choose the file: blue */
-.m2 { --m:#0b7a75; --mbg:#e4f6f4; }  /* check the tables: teal */
-.m3 { --m:#6d3fc4; --mbg:#f1ebff; }  /* privacy policy: violet */
-.m4 { --m:#a84e08; --mbg:#fff2df; }  /* columns: orange */
-.m5 { --m:#1b7038; --mbg:#e7f7ec; }  /* generate and download: green */
+   The number and the title carry the same information, so colour is never the only cue.
+   --m: the vivid colour; --mt: text on it; --mh: headings on the pale tint --mbg. */
+.m1 { --m:#1565d8; --mt:#fff; --mh:#0d4ea8; --mbg:#e6f0ff; }  /* choose the file: blue */
+.m2 { --m:#f5b700; --mt:#2b2100; --mh:#7a5600; --mbg:#fff6d1; }  /* check the tables: yellow */
+.m3 { --m:#d7263d; --mt:#fff; --mh:#a3172b; --mbg:#ffe8eb; }  /* privacy policy: red */
+.m4 { --m:#7b3fe4; --mt:#fff; --mh:#5a25b8; --mbg:#f0e8ff; }  /* columns: violet */
+.m5 { --m:#14a44d; --mt:#fff; --mh:#0c7a37; --mbg:#e2f7ea; }  /* generate and download: green */
 section.m1, section.m2, section.m3, section.m4, section.m5 { border-left:6px solid var(--m); }
-section.m1 > h2, section.m2 > h2, section.m3 > h2, section.m4 > h2, section.m5 > h2 { background:var(--mbg); color:var(--m); margin:-14px -18px 10px; padding:10px 18px; border-radius:0 8px 0 0; }
+section.m1 > h2, section.m2 > h2, section.m3 > h2, section.m4 > h2, section.m5 > h2 { background:var(--mbg); color:var(--mh); margin:-14px -18px 10px; padding:10px 18px; border-radius:0 8px 0 0; }
+section .step { background:var(--m); color:var(--mt); }
+button.primary, a.btn { background:var(--m, var(--accent)); border-color:var(--m, var(--accent)); color:var(--mt, #fff); font-weight:600; }
 #s-glance { border-left:6px solid var(--ink); }
-#s-glance li { margin:3px 0; }
-#steps { display:flex; flex-wrap:wrap; gap:8px; padding:10px 28px; background:var(--card); border-bottom:1px solid var(--line); }
-#steps .st { display:inline-flex; align-items:center; gap:6px; padding:3px 12px 3px 4px; border-radius:16px; border:1px solid var(--m); background:var(--mbg); color:var(--m); text-decoration:none; font-weight:600; }
-#steps .st b { display:inline-block; width:22px; height:22px; line-height:22px; text-align:center; border-radius:50%; background:var(--m); color:#fff; font-size:12px; }
-#steps .st.off { opacity:.5; border-style:dashed; }
-.cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:10px; margin:8px 0; }
-.card { display:flex; flex-direction:column; gap:6px; border:1px solid var(--line); border-radius:8px; padding:10px; background:#fff; }
+#s-glance li { margin:6px 0; }
+#s-glance ul { margin-left:16px; }
+#steps { display:flex; flex-wrap:wrap; gap:10px; padding:12px 28px; background:var(--card); border-bottom:1px solid var(--line); }
+#steps .st { display:inline-flex; align-items:center; gap:8px; padding:6px 16px 6px 6px; border-radius:20px; border:2px solid var(--m); background:var(--m); color:var(--mt); text-decoration:none; font-weight:700; font-size:15px; box-shadow:0 1px 3px rgba(0,0,0,.18); }
+#steps .st b { display:inline-block; width:26px; height:26px; line-height:26px; text-align:center; border-radius:50%; background:var(--mt); color:var(--m); font-size:14px; }
+#steps .st:hover { filter:brightness(1.08); }
+#steps .st.off { background:var(--mbg); color:var(--mh); box-shadow:none; opacity:.75; }
+#steps .st.off b { background:var(--m); color:var(--mt); }
+
+/* Step 2 on the left, "your file at a glance" beside it on the right. */
+.split { display:grid; grid-template-columns:minmax(0, 3fr) minmax(260px, 2fr); gap:14px; align-items:start; }
+.split > section, .split > aside > section { margin:14px 0; }
+.split > aside { position:sticky; top:8px; }
+@media (max-width: 900px) { .split { grid-template-columns:minmax(0, 1fr); } .split > aside { position:static; order:-1; } }
+
+/* Regions: one line each; the details open on a click. */
+.cards { margin:8px 0; }
+.card { border:1px solid var(--line); border-radius:8px; background:#fff; }
+.card > summary { list-style:none; padding:8px 12px; }
+.card > summary::-webkit-details-marker { display:none; }
+.card > summary::before { content:"\25B8"; color:var(--muted); margin-right:2px; }
+.card[open] > summary::before { content:"\25BE"; }
+.card[open] > summary { border-bottom:1px solid var(--line); }
+.card-body { display:flex; flex-direction:column; gap:8px; padding:10px 12px; min-width:0; }
+.card-fields { display:flex; flex-direction:column; gap:6px; max-width:520px; }
+.meta { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.card-top .rname { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:40%; }
+.card-top .pill { flex-shrink:0; }
+
+/* The two groups of regions: tables first, small regions and notes collapsed below. */
+.rgroup { margin:8px 0; }
+.rgroup h3 { margin:6px 0; color:var(--mh); }
+.rgroup .count { color:var(--muted); font-weight:400; }
+.rgroup > .card { margin:6px 0; }
+details.rgroup.small { border:1px dashed var(--line); border-radius:8px; padding:6px 10px; background:#fafbfc; }
+details.rgroup.small > summary { font-size:15px; color:var(--mh); padding:2px 0; }
+details.rgroup.small > .hint { margin-top:6px; }
+
+/* Small preview of one region, inside its line. Bounded both ways; wide tables scroll sideways. */
+.mini { min-width:0; }
+.mini-grid { max-height:220px; max-width:100%; }
+table.mini-table { width:auto; font-size:12px; }
+table.mini-table th { background:var(--mbg); color:var(--ink); font-family:ui-monospace, Menlo, Consolas, monospace; font-weight:700; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+table.mini-table th.corner { background:#eef1f5; font-family:inherit; }
+table.mini-table td { color:var(--ink); max-width:180px; }
+button.small-btn { padding:4px 10px; font-weight:600; border-color:var(--m, var(--accent)); color:var(--mh, var(--accent)); white-space:nowrap; }
+.rname { font-weight:700; }
+.kind { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 6px; }
 .card.low { border-color:#ecd3a4; background:#fffbf2; }
 .card.sel { border-color:var(--m); box-shadow:0 0 0 2px var(--m); }
 .card.out { opacity:.7; }
-.card-top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+.card-top { display:flex; align-items:center; gap:10px; cursor:pointer; }
+.card-top .pill { margin-left:auto; }
 .card input[type=text], .card select { min-width:0; width:100%; }
-button.link { border:0; background:none; padding:0; color:var(--m, var(--accent)); text-decoration:underline; text-align:left; }
+button.link { border:0; background:none; padding:0; color:var(--mh, var(--accent)); text-decoration:underline; text-align:left; }
 .preview { margin:10px 0; }
 .preview h3 { margin-top:6px; }
 td.k { font-size:12px; text-align:center; white-space:nowrap; }
@@ -95,9 +139,24 @@ table.sheet th.corner { padding:4px 7px; }
 .colbtn.dropped .nm { text-decoration:line-through; }
 .panel { border:1px solid var(--m); border-radius:8px; padding:6px 14px 10px; margin:10px 0; background:#fff; }
 .panel h3 { color:var(--m); }
-.bulk { background:var(--mbg); border-radius:6px; padding:8px 10px; }
+.bulk { background:var(--mbg); border-radius:8px; padding:4px 14px 10px; margin:10px 0; }
+.bulk h3 { color:var(--mh); }
+.choice { display:flex; flex-wrap:wrap; gap:10px; margin:6px 0 10px; }
+.choice .opt { display:flex; align-items:center; gap:8px; background:#fff; border:2px solid var(--line); border-radius:8px; padding:8px 14px; cursor:pointer; }
+.choice .opt:has(input:checked) { border-color:var(--m); box-shadow:0 0 0 1px var(--m); }
+#bulk-tools select { min-width:260px; }
+#names-custom table { max-width:640px; }
+#nm-more { margin-top:8px; }
+#nm-more summary { font-weight:500; color:var(--muted); }
+
+/* Step 5: what will be generated. */
+#gen-summary h3 { margin-top:4px; color:var(--mh); }
+.sumcard { border:1px solid var(--line); border-radius:8px; padding:4px 12px 6px; margin:8px 0; background:#fff; }
+.sumcard .scroll { max-height:none; }
+td.cell.src { background:#eef1f5; }
+td.cell.syn { background:var(--mbg); }
 button.big { padding:9px 18px; font-size:15px; font-weight:600; }
-a.btn { display:inline-block; padding:8px 16px; margin:6px 8px 2px 0; border-radius:6px; background:var(--m, var(--accent)); color:#fff; text-decoration:none; font-weight:600; }
+a.btn { display:inline-block; padding:8px 16px; margin:6px 8px 2px 0; border-radius:6px; text-decoration:none; }
 
 /* Source inspector: original cells. The selected region is tinted, its header row is bold, the rest is context. */
 table.src td { font-family:ui-monospace, Menlo, Consolas, monospace; white-space:pre; max-width:280px; overflow:hidden; text-overflow:ellipsis; color:var(--muted); }
@@ -105,9 +164,14 @@ table.src td.in { background:var(--mbg, #eef4fb); color:var(--ink); }
 table.src td.hdr { background:var(--mbg, #eef4fb); color:var(--ink); font-weight:700; border-bottom:2px solid var(--m, var(--accent)); }
 table.src td.oth { background:#f3f4f6; color:var(--ink); }
 table.src td.absent { background:repeating-linear-gradient(135deg, #fafafa, #fafafa 6px, #f0f1f3 6px, #f0f1f3 12px); }
-table.src th.in { background:var(--m, var(--accent)); color:#fff; }
-table.src th button.link { color:#fff; font-weight:600; }
+table.src th.in { background:var(--m, var(--accent)); color:var(--mt, #fff); }
+table.src th button.link { color:var(--mt, #fff); font-weight:600; }
 tr.srcrow td { background:#eef1f5; }
 tr.srcrow td.rowhead, tr.synrow td.rowhead { font-weight:600; white-space:nowrap; }
 .legend span { display:inline-block; padding:1px 8px; margin-right:6px; border:1px solid var(--line); border-radius:4px; font-size:12px; }
 .legend .in { background:var(--mbg); } .legend .oth { background:#f3f4f6; } .legend .ctx { color:var(--muted); }
+#source-box > summary { font-size:15px; margin:12px 0 6px; }
+.sumcard table { width:auto; min-width:50%; }
+.sumcard td.cell { min-width:90px; }
+.split > section, .split > aside { min-width:0; }
+@media (max-width: 600px) { input[type=text], input[type=number], select { min-width:0; max-width:100%; } main { padding:8px 10px 30px; } }

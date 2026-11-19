@@ -223,7 +223,8 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     assert ctx.eval("state.panels['table_1\\u0000c4'].hidden") is False
     assert "Column quantity of table_1" in ctx.eval("state.panels['table_1\\u0000c4'].textContent")
     # Bulk renaming only fills the name fields in; it must be applied like any other edit.
-    ctx.eval("document.getElementById('bulk-style').value = 'upper'; document.getElementById('bulk-prefix').value = 'x_'")
+    ctx.eval("document.getElementById('bulk-how').value = 'prefix';"
+             "document.getElementById('bulk-style').value = 'upper'; document.getElementById('bulk-prefix').value = 'x_'")
     _click(ctx, "btn-bulk")
     assert "7 output name(s) of table_1 were filled in" in ctx.eval("__text('msg')")
     sheet = ctx.eval("__text('sheet')")
@@ -233,7 +234,8 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     assert "unapplied changes" in ctx.eval("__text('msg')") and _hidden(ctx, "s-result") is True
     # Selected columns get Greek-letter names after a preview; the others keep the bulk change.
     ctx.eval("document.getElementById('bulk-style').value = ''; document.getElementById('bulk-prefix').value = '';"
-             "document.getElementById('bulk-mode').value = 'sequence'; document.getElementById('bulk-target').value = 'selected';"
+             "document.getElementById('bulk-how').value = 'theme'; document.getElementById('bulk-theme').value = 'greek';"
+             "document.getElementById('bulk-target').value = 'selected';"
              "__fire('bulk-target', 'change')")
     ctx.eval("document.querySelectorAll('#bulk-cols [data-col]').filter((x) => ['c2', 'c3'].includes(x.dataset.col))"
              ".forEach((x) => { x.checked = true; })")
@@ -245,12 +247,12 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
     assert ctx.eval("state.fields['table_1\\u0000c2'].name.value") == "Alpha"
     assert ctx.eval("state.fields['table_1\\u0000c3'].name.value") == "Beta"
     # A list of the wrong length is refused with the counts, and nothing is filled in.
-    ctx.eval("document.getElementById('bulk-mode').value = 'list'; document.getElementById('bulk-names').value = 'one'")
+    ctx.eval("document.getElementById('bulk-theme').value = 'mine'; document.getElementById('bulk-names').value = 'one'")
     _click(ctx, "btn-bulk")
     assert "1 name(s) were given for 2 selected column(s)" in ctx.eval("__text('msg')")
     assert ctx.eval("state.fields['table_1\\u0000c2'].name.value") == "Alpha"
     ctx.eval("document.getElementById('bulk-target').value = 'all'; __fire('bulk-target', 'change');"
-             "document.getElementById('bulk-mode').value = 'edit'")
+             "document.getElementById('bulk-how').value = 'prefix'; document.getElementById('bulk-prefix').value = ''")
     # One column renamed by hand on top of the bulk change, then applied.
     ctx.eval("state.fields['table_1\\u0000c4'].name.value = 'qty'")
     _click(ctx, "btn-contract")
@@ -273,6 +275,46 @@ def test_first_screen_summary_layout_and_column_workspace(page, truths):
         assert canary not in generated_side
 
 
+def test_naming_choices_and_the_summary_before_generation(page):
+    ctx = page
+    ctx.eval(f"document.getElementById('path').value = {json.dumps(product_path('orders_multi.tsv'))}")
+    _click(ctx, "btn-open")
+    ctx.eval("document.getElementById('policies').walk([]).filter((n) => n.name === 'policy')[0].checked = true")
+    _click(ctx, "btn-profile")
+    assert ctx.eval("__text('msg')") == ""
+    assert ctx.eval("document.getElementById('names-keep').checked") is True
+    # The summary names the table and its columns, then three original rows above three synthetic rows.
+    summary = ctx.eval("__text('gen-summary')")
+    assert "What will be generated" in summary and "Table table_1:" in summary and "synthetic values for 7 column(s)" in summary
+    assert "your file, row 7" in summary and "your file, row 8" not in summary
+    assert "synthetic 3" in summary and "synthetic 4" not in summary
+    assert "anonym" not in summary.lower()
+    # A themed list is a fixed vocabulary of the page, checked by the server's naming layer.
+    ctx.eval("document.getElementById('names-change').checked = true; document.getElementById('names-keep').checked = false;"
+             "document.getElementById('bulk-how').value = 'theme'; document.getElementById('bulk-theme').value = 'cities'")
+    _click(ctx, "btn-bulk")
+    assert "7 output name(s) of table_1 were filled in" in ctx.eval("__text('msg')")
+    assert [ctx.eval(f"state.fields['table_1\\u0000c{i}'].name.value") for i in (1, 2, 7)] == ["Tokyo", "Paris", "Rome"]
+    _click(ctx, "btn-contract")
+    assert ctx.eval("__text('msg')") == "" and "Tokyo" in ctx.eval("__text('gen-summary')")
+    assert ctx.eval("document.getElementById('names-change').checked") is True
+    # "Keep the names" brings back the names of the file, which then have to be applied.
+    ctx.eval("document.getElementById('names-keep').checked = true; __fire('names-keep', 'change')")
+    assert ctx.eval("state.fields['table_1\\u0000c1'].name.value") == "order_no"
+    assert "Unapplied changes" in ctx.eval("__text('contract-state')") and "unapplied changes" in ctx.eval("__text('gen-summary')")
+    _click(ctx, "btn-contract")
+    assert "order_no" in ctx.eval("__text('gen-summary')") and "Tokyo" not in ctx.eval("__text('gen-summary')")
+
+
+def test_theme_lists_give_distinct_names_for_long_tables(page):
+    ctx = page
+    for theme in ("letters", "cities", "nato", "digits", "words", "rivers", "lakes", "stars", "scientists"):
+        names = json.loads(ctx.eval(f"JSON.stringify(themeNames('{theme}', 70))"))
+        assert len(names) == 70 and len(set(names)) == 70 and all(names), theme
+    assert json.loads(ctx.eval("JSON.stringify(themeNames('words', 3))")) == ["One", "Two", "Three"]
+    assert json.loads(ctx.eval("JSON.stringify(themeNames('letters', 28).slice(25))")) == ["Z", "A2", "B2"]
+
+
 def test_every_element_the_script_looks_up_exists_in_the_page():
     # The test DOM creates elements on demand, so a misspelt id would pass there and fail in a browser.
     with open(os.path.join(STATIC, "app.js"), encoding="utf-8") as fh:
@@ -291,7 +333,8 @@ def test_every_element_the_script_looks_up_exists_in_the_page():
     with open(os.path.join(STATIC, "app.css"), encoding="utf-8") as fh:
         css = fh.read()
     for cls in ("card", "sel", "low", "out", "panel", "tab", "colbtn", "dropped", "rowhead", "sheet", "corner", "btn", "link",
-                "bulk", "big", "cards", "preview", "src", "in", "hdr", "oth", "absent", "srcrow", "synrow", "legend"):
+                "bulk", "big", "cards", "preview", "src", "in", "hdr", "oth", "absent", "srcrow", "synrow", "legend",
+                "card-body", "rname", "kind", "choice", "opt", "sumcard", "syn", "split"):
         assert "." + cls in css, cls
     # Nothing but the page's own functions may put text on the page: a null handed to the DOM shows as "null".
     assert not re.search(r"replaceChildren\([^)]*\?[^)]*: null\)", script)

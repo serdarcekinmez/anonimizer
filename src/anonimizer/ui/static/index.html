@@ -32,17 +32,13 @@
     </div>
   </section>
 
-  <section id="s-glance" hidden>
-    <h2>Your file at a glance</h2>
-    <ul id="glance"></ul>
-  </section>
-
+  <div class="split">
   <section id="s-regions" class="m2" hidden>
-    <h2><span class="step">2</span> Check the tables found in your file</h2>
-    <p class="hint">Each card is a region the tool detected. A detection is a proposal: it becomes "confirmed by you" only when you press the confirm button below. Untick "Use" to leave a region out.</p>
+    <h2><span class="step">2</span> Check the tables to decide your columns</h2>
+    <p class="hint">Each line is a region the tool detected. Tables with 5 or more data rows come first; small regions and notes are grouped below them. Click a line to see a preview of its cells and change its details. A detection becomes "confirmed by you" only when you press the confirm button below.</p>
     <div id="region-cards" class="cards"></div>
-    <div id="source-box" class="preview">
-      <h3 id="source-title">Your file</h3>
+    <details id="source-box" class="preview" open>
+      <summary id="source-title">Your file</summary>
       <p class="hint">These are the original cells of your file, read on this machine for this page only. They are not written to any report, manifest or export. No privacy policy is needed to look at them.</p>
       <div class="row">
         <label for="src-sheet">Sheet</label><select id="src-sheet" class="short"></select>
@@ -61,7 +57,7 @@
         <span class="hint">Exact counts per column, computed and shown on this machine only.</span>
       </div>
       <div id="stats"></div>
-    </div>
+    </details>
     <details id="regions-tech">
       <summary>Technical details: row and column numbers, detection confidence, parsing options</summary>
       <div id="file-facts" class="facts"></div>
@@ -79,6 +75,13 @@
       <span id="recipe-state" class="hint"></span>
     </div>
   </section>
+  <aside>
+    <section id="s-glance" hidden>
+      <h2>Your file at a glance</h2>
+      <ul id="glance"></ul>
+    </section>
+  </aside>
+  </div>
 
   <section id="s-policy" class="m3" hidden>
     <h2><span class="step">3</span> Choose a privacy policy and analyse</h2>
@@ -92,31 +95,68 @@
     <p class="hint">Pick a table, then click a column heading to edit it. These are proposals; nothing changes until you press "Apply decisions".</p>
     <div id="table-tabs" class="tabs"></div>
     <div id="sheet" class="preview"></div>
-    <div id="bulk" class="row bulk">
-      <strong>Rename columns of this table:</strong>
-      <label for="bulk-target">Columns</label>
-      <select id="bulk-target" class="short">
-        <option value="all">all kept columns</option><option value="selected">only the columns ticked below</option>
-      </select>
-      <label for="bulk-mode">New names</label>
-      <select id="bulk-mode" class="short">
-        <option value="edit">edit the current names</option><option value="sequence">Alpha, Beta, Gamma, …</option><option value="list">my list of names</option>
-      </select>
-      <div id="bulk-cols" class="row" hidden></div>
-      <label for="bulk-names">Names, one per line, in column order (an empty line keeps a name)</label>
-      <textarea id="bulk-names" rows="4" cols="30" autocomplete="off"></textarea>
-      <select id="bulk-style" class="short" aria-label="Spelling">
-        <option value="">keep spelling</option><option value="snake">snake_case</option><option value="lower">lower case</option><option value="upper">UPPER CASE</option>
-      </select>
-      <label for="bulk-find">Find</label><input id="bulk-find" type="text" class="short" autocomplete="off">
-      <label for="bulk-replace">Replace with</label><input id="bulk-replace" type="text" class="short" autocomplete="off">
-      <label for="bulk-prefix">Prefix</label><input id="bulk-prefix" type="text" class="short" autocomplete="off">
-      <label for="bulk-suffix">Suffix</label><input id="bulk-suffix" type="text" class="short" autocomplete="off">
-      <button id="btn-bulk-preview">Preview</button>
-      <button id="btn-bulk">Fill in the new names</button>
-      <button id="btn-bulk-undo">Restore the applied names</button>
+    <div id="bulk" class="bulk">
+      <h3>Column names of this table</h3>
+      <div class="choice" role="radiogroup" aria-label="Column names">
+        <label class="opt"><input id="names-keep" type="radio" name="naming" value="keep" checked> Keep the column names as they are</label>
+        <label class="opt"><input id="names-change" type="radio" name="naming" value="change"> Change the column names</label>
+      </div>
+      <div id="bulk-tools" hidden>
+        <div class="row">
+          <label for="bulk-how">How</label>
+          <select id="bulk-how">
+            <option value="prefix">Add a prefix to all columns</option>
+            <option value="suffix">Add a suffix to all columns</option>
+            <option value="theme">Give new names from a list</option>
+            <option value="custom">I will choose each name myself</option>
+          </select>
+          <span id="nm-prefix"><label for="bulk-prefix">Prefix</label> <input id="bulk-prefix" type="text" class="short" autocomplete="off" placeholder="e.g. test_"></span>
+          <span id="nm-suffix" hidden><label for="bulk-suffix">Suffix</label> <input id="bulk-suffix" type="text" class="short" autocomplete="off" placeholder="e.g. _x"></span>
+          <span id="nm-theme" hidden><label for="bulk-theme">List</label>
+            <select id="bulk-theme">
+              <option value="letters">Letters: A, B, C …</option>
+              <option value="cities">World cities: Tokyo, Paris, London …</option>
+              <option value="nato">Alpha, Bravo, Charlie … Oscar …</option>
+              <option value="greek">Greek letters: Alpha, Beta, Gamma …</option>
+              <option value="digits">Numbers in digits: 1, 2, 3 …</option>
+              <option value="words">Numbers in letters: One, Two, Three …</option>
+              <option value="rivers">World rivers: Nile, Amazon, Danube …</option>
+              <option value="lakes">World lakes: Baikal, Victoria, Titicaca …</option>
+              <option value="stars">Stars and planets: Mercury, Venus, Sirius …</option>
+              <option value="scientists">Scientists: Curie, Newton, Einstein …</option>
+              <option value="mine">My own list of names</option>
+            </select>
+          </span>
+        </div>
+        <div id="nm-list" class="row" hidden>
+          <label for="bulk-names">My names, one per line, in column order (an empty line keeps a name)</label>
+          <textarea id="bulk-names" rows="4" cols="30" autocomplete="off"></textarea>
+        </div>
+        <div id="names-custom" hidden></div>
+        <div id="nm-actions" class="row">
+          <button id="btn-bulk-preview">Preview</button>
+          <button id="btn-bulk" class="primary">Use these names</button>
+          <button id="btn-bulk-undo">Restore the applied names</button>
+        </div>
+        <details id="nm-more">
+          <summary>More options: only some columns, spelling, find and replace</summary>
+          <div class="row">
+            <label for="bulk-target">Columns</label>
+            <select id="bulk-target">
+              <option value="all">all kept columns</option><option value="selected">only the columns ticked below</option>
+            </select>
+            <label for="bulk-style">Spelling</label>
+            <select id="bulk-style">
+              <option value="">keep spelling</option><option value="snake">snake_case</option><option value="lower">lower case</option><option value="upper">UPPER CASE</option>
+            </select>
+            <label for="bulk-find">Find</label><input id="bulk-find" type="text" class="short" autocomplete="off">
+            <label for="bulk-replace">Replace with</label><input id="bulk-replace" type="text" class="short" autocomplete="off">
+          </div>
+          <div id="bulk-cols" class="row" hidden></div>
+        </details>
+        <p class="hint">New names are used in the generated dataset and in the contract. The source report, the comparison and report.md of the bundle still name the columns as in your file.</p>
+      </div>
     </div>
-    <p class="hint">New names are used in the generated dataset and in the contract. The source report, the comparison and report.md of the bundle still name the columns as in your file.</p>
     <div id="bulk-preview"></div>
     <div id="contract"></div>
     <p class="hint">Each column is generated on its own. Rules that link several columns of one row (totals, date order, dependent codes) are not detected and not preserved.</p>
@@ -137,6 +177,7 @@
 
   <section id="s-generate" class="m5" hidden>
     <h2><span class="step">5</span> Generate and download</h2>
+    <div id="gen-summary"></div>
     <div id="gen-settings">
       <div class="row">
         <label for="rows">Synthetic rows</label><input id="rows" type="number" min="1" value="50" class="short">

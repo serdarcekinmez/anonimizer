@@ -10,6 +10,8 @@ const SOURCE_ROWS = 5;  // original rows shown above the synthetic sample in ste
 const state = {
   meta: null, inspect: null, report: null, contract: null,
   region: null, cards: [],            // step 2: selected region and its card nodes
+  minis: {}, techInputs: {},          // step 2: small preview box and first correction field per region
+  smallOpen: undefined,               // step 2: whether "Small regions and notes" was opened or closed by the user
   table: null, column: null,          // step 4: selected table name and column id ("" = whole rows)
   fields: {}, panels: {},             // step 4: form controls and panels by "table\u0000column"
   sample: null, sampleStale: false,   // synthetic sample rows of the applied contract
@@ -17,6 +19,7 @@ const state = {
   src: null,                          // source inspector: the rectangle of original cells on screen
   srcRows: {},                        // first original data rows per table, for the grid of step 4
   stats: null,                        // exact local counts, once asked for
+  original: {},                       // step 4: each column's name in the file, kept from the analysis
 };
 
 function el(tag, attrs, ...children) {
@@ -164,6 +167,8 @@ function renderGlance() {
   const lines = [fileFacts(data).join(" · ")];
   lines.push(regions.length + " region(s) found: " + count((t) => t.kind === "table") + " read as table(s), "
     + count((t) => t.kind !== "table") + " read as note(s), meaning text outside a table.");
+  if (regions.length) lines.push(count(isMainTable) + " table(s) have " + MAIN_ROWS + " or more data rows and are listed first in step 2; "
+    + count((t) => !isMainTable(t)) + " smaller region(s) and note(s) are grouped below them.");
   lines.push(confirmed === 0 ? "You have not confirmed any region yet: all of them are automatic detections."
     : confirmed + " of " + regions.length + " region(s) were confirmed or set by you; the others are automatic detections.");
   if (low) lines.push(low + " region(s) in use were detected with low confidence. Check them in step 2.");
@@ -195,6 +200,54 @@ function regionStatus(t) {
   return pill("detected automatically", "");
 }
 
+// The list of regions is split in two for display only. Which regions are analysed and generated is
+// decided by "Use this region" and the confirm button, never by the group a region is shown in.
+const MAIN_ROWS = 5;   // a table region with at least this many data rows is listed under "Detected tables"
+const MINI_ROWS = 5;   // data rows shown in the small preview of a region
+const MINI_COLS = 30;  // columns fetched for the small preview; wider regions scroll and say so
+const plural = (n, one, many) => n + " " + (n === 1 ? one : many);
+// Sizes come from the region's own row and column numbers. The header row is not a data row.
+function regionSize(t) {
+  return {
+    rows: t.kind === "table" ? t.last_data_row - t.first_data_row + 1 : t.last_data_row - t.first_row + 1,
+    cols: t.last_col - t.first_col + 1,
+  };
+}
+const isMainTable = (t) => t.kind === "table" && regionSize(t).rows >= MAIN_ROWS;
+const cardClass = (t, sel) => "card" + (t.confidence < LOW ? " low" : "") + (t.include ? "" : " out") + (sel ? " sel" : "");
+
+function regionCard(t, i, multiSheet) {
+  const low = t.confidence < LOW;
+  const size = regionSize(t);
+  const where = (t.sheet && t.sheet !== "csv" ? "Sheet " + t.sheet + " · " : "")
+    + "rows " + t.first_row + "–" + t.last_data_row + " · columns " + t.first_col + "–" + t.last_col + " · "
+    + (t.kind !== "table" ? "not read as a table" : t.header_row ? "header in row " + t.header_row : "no header row")
+    + " · detection confidence " + t.confidence;
+  const meta = (multiSheet && t.sheet ? "Sheet " + t.sheet + " · " : "")
+    + (t.kind === "table" ? plural(size.rows, "data row", "data rows") : plural(size.rows, "row", "rows")) + " · "
+    + plural(size.cols, "column", "columns") + (t.kind === "table" && !t.header_row ? " · no header row" : "");
+  const mini = el("div", { class: "mini" });
+  state.minis[i] = mini;
+  // One short line per region. Opening it shows a small preview of its cells, loaded only then.
+  const card = el("details", { class: cardClass(t, false), ontoggle: () => { if (card.open) loadMini(i); } },
+    el("summary", { class: "card-top" },
+      el("span", { class: "rname", text: t.name }),
+      el("span", { class: "kind", text: t.kind === "table" ? "table" : "note" }),
+      el("span", { class: "meta", text: meta }),
+      regionStatus(t)),
+    el("div", { class: "card-body" },
+      mini,
+      el("div", { class: "card-fields" },
+        el("label", {}, el("input", { type: "checkbox", checked: t.include, "data-i": i, "data-k": "include" }), " Use this region"),
+        el("input", { type: "text", value: t.name, "data-i": i, "data-k": "name", "aria-label": "Name of region " + (i + 1) }),
+        el("select", { "data-i": i, "data-k": "kind", "aria-label": "Kind of region " + (i + 1) },
+          ["table", "note"].map((k) => el("option", { value: k, selected: t.kind === k, text: k === "table" ? "table" : "note (text outside a table)" }))),
+        el("div", { class: "hint", text: where }),
+        low && (t.notes || []).length ? el("div", { class: "low", text: t.notes.join("; ") }) : null,
+        el("button", { class: "link", text: "Correct its rows, columns or header", onclick: () => openCorrections(i) }))));
+  return card;
+}
+
 function renderInspect(data) {
   state.inspect = data;
   state.report = null;
@@ -206,26 +259,31 @@ function renderInspect(data) {
   $("stats").replaceChildren();
   $("file-facts").textContent = fileFacts(data).join(" · ");
   const regions = data.recipe.tables;
-  state.cards = regions.map((t, i) => {
-    const low = t.confidence < LOW;
-    const where = (t.sheet && t.sheet !== "csv" ? "Sheet " + t.sheet + " · " : "")
-      + "rows " + t.first_row + "–" + t.last_data_row + " · columns " + t.first_col + "–" + t.last_col + " · "
-      + (t.kind !== "table" ? "not read as a table" : t.header_row ? "header in row " + t.header_row : "no header row");
-    return el("div", { class: "card" + (low ? " low" : "") + (t.include ? "" : " out") },
-      el("div", { class: "card-top" },
-        el("label", {}, el("input", { type: "checkbox", checked: t.include, "data-i": i, "data-k": "include" }), " Use"),
-        regionStatus(t)),
-      el("input", { type: "text", value: t.name, "data-i": i, "data-k": "name", "aria-label": "Name of region " + (i + 1) }),
-      el("select", { "data-i": i, "data-k": "kind", "aria-label": "Kind of region " + (i + 1) },
-        ["table", "note"].map((k) => el("option", { value: k, selected: t.kind === k, text: k === "table" ? "table" : "note (text outside a table)" }))),
-      el("div", { class: "hint", text: where }),
-      low && (t.notes || []).length ? el("div", { class: "low", text: t.notes.join("; ") }) : null,
-      el("button", { class: "link", text: "Show this region in the file", onclick: () => selectRegion(i) }));
-  });
-  $("region-cards").replaceChildren(...state.cards);
+  const multiSheet = new Set(regions.map((t) => t.sheet)).size > 1 || (data.sheets || []).length > 1;
+  state.minis = {};  // previews belong to one applied set of table settings
+  state.cards = regions.map((t, i) => regionCard(t, i, multiSheet));
+  const main = [];
+  const small = [];
+  regions.forEach((t, i) => (isMainTable(t) ? main : small).push(state.cards[i]));  // source order within each group
+  const smallBox = el("details", { class: "rgroup small",
+    open: state.smallOpen === undefined ? main.length === 0 : state.smallOpen || main.length === 0,
+    ontoggle: () => { if (main.length) state.smallOpen = smallBox.open; } },  // forced open when alone: not the user's choice
+    el("summary", {}, "Small regions and notes ", el("span", { class: "count", text: "(" + small.length + ")" })),
+    el("p", { class: "hint", text: "Tables with fewer than " + MAIN_ROWS + " data rows, and text read as notes. Some of them may still be "
+      + "useful tables: open one to see its cells. Being listed here changes nothing: a region is used if \"Use this region\" is ticked." }),
+    small.length ? small : el("p", { class: "hint", text: "There is no small region or note in this file." }));
+  $("region-cards").replaceChildren(
+    el("div", { class: "rgroup main" },
+      el("h3", {}, "Detected tables ", el("span", { class: "count", text: "(" + main.length + ")" })),
+      main.length ? main : el("p", { class: "hint", text: "No table with " + MAIN_ROWS + " or more data rows was found. "
+        + (small.length ? "Your tables may be among the small regions below, which are opened for this reason." : "") })),
+    smallBox);
+  state.techInputs = {};
   const rows = regions.map((t, i) => {
     const num = (k) => el("input", { type: "number", min: "1", class: "num", value: t[k] === null ? "" : t[k], "data-i": i, "data-k": k });
-    return [t.name, t.sheet || "", num("header_row"), num("first_data_row"), num("last_data_row"), num("first_col"), num("last_col"),
+    const first = num("header_row");
+    state.techInputs[i] = first;
+    return [t.name, t.sheet || "", first, num("first_data_row"), num("last_data_row"), num("first_col"), num("last_col"),
       el("span", { class: t.confidence < LOW ? "low" : null, text: t.confidence }),
       (t.notes || []).join("; ") + (t.source === "user" ? " [set by you]" : "")];
   });
@@ -235,17 +293,72 @@ function renderInspect(data) {
   hideFrom(["s-report", "s-contract", "s-generate"]);
   renderPolicies();
   renderGlance();
-  const first = regions.findIndex((t) => t.kind === "table" && t.include);
+  let first = regions.findIndex((t) => isMainTable(t) && t.include);
+  if (first < 0) first = regions.findIndex((t) => t.kind === "table" && t.include);
   if (regions.length) selectRegion(first < 0 ? 0 : first);
 }
 
 function selectRegion(i) {
   state.region = i;
   const regions = state.inspect.recipe.tables;
-  state.cards.forEach((card, j) => {
-    card.className = "card" + (regions[j].confidence < LOW ? " low" : "") + (regions[j].include ? "" : " out") + (j === i ? " sel" : "");
-  });
+  state.cards.forEach((card, j) => { card.className = cardClass(regions[j], j === i); });
+  $("source-box").open = true;
   return loadSource({ region: i });
+}
+
+// The small preview inside a region's line: its header and first data rows, read on demand from the
+// local source inspector. Looking at it selects, confirms and changes nothing.
+async function loadMini(i) {
+  const box = state.minis[i];
+  if (!box || box.dataset.loaded) return;
+  box.dataset.loaded = "1";
+  const t = state.inspect.recipe.tables[i];
+  const size = regionSize(t);
+  const isTable = t.kind === "table";
+  const start = isTable ? (t.header_row || t.first_data_row) : t.first_row;
+  const dataFrom = isTable ? t.first_data_row : t.first_row;
+  const open = el("button", { class: "small-btn", text: "Open detailed preview", onclick: () => openDetailed(i) });
+  box.replaceChildren(el("p", { class: "hint", text: "Loading a preview…" }));
+  let d;
+  try {
+    d = await api("/api/source", { region: i, row: start, col: t.first_col, rows: dataFrom - start + MINI_ROWS, cols: Math.min(size.cols, MINI_COLS) });
+  } catch (e) {
+    delete box.dataset.loaded;
+    box.replaceChildren(el("p", { class: "low", text: "The preview could not be shown: " + e.message }), el("div", { class: "row" }, open));
+    return;
+  }
+  const cols = Array.from({ length: d.columns }, (_, j) => d.first_col + j);
+  const header = isTable && t.header_row ? d.rows.find((r) => r.row === t.header_row) : null;
+  const data = d.rows.filter((r) => r.row >= dataFrom && r.row <= t.last_data_row).slice(0, MINI_ROWS);
+  const cell = (v) => (v === null || v === undefined ? "" : v);
+  const head = el("tr", {}, el("th", { class: "corner", text: "Row" }),
+    cols.map((c, j) => el("th", { text: header ? cell(header.cells[j]) || "col " + c : "col " + c })));
+  const body = data.map((r) => el("tr", {}, el("td", { class: "rowhead", text: String(r.row) }),
+    r.cells.map((v) => el("td", { class: v === null ? "absent" : null, text: cell(v) }))));
+  const notes = [];
+  if (isTable) notes.push(header ? "Header in row " + t.header_row + "." : "No header row: the columns are shown by number.");
+  notes.push("First " + plural(data.length, "row", "rows") + " of " + size.rows + (isTable ? " data row(s)." : " row(s)."));
+  if (size.cols > d.columns) notes.push("Columns " + d.first_col + "–" + (d.first_col + d.columns - 1) + " of " + t.first_col + "–" + t.last_col + " are shown.");
+  if (d.truncated_cells) notes.push(plural(d.truncated_cells, "long cell is", "long cells are") + " cut for display.");
+  box.replaceChildren(
+    el("div", { class: "scroll mini-grid" }, el("table", { class: "src mini-table" }, el("thead", {}, head), el("tbody", {}, body))),
+    el("div", { class: "row" }, open, el("span", { class: "hint", text: notes.join(" ") })));
+}
+
+// Shows the region in the large source viewer, with what surrounds it, and brings the viewer into view.
+async function openDetailed(i) {
+  await selectRegion(i);
+  $("source-box").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// The boundary and header numbers live in the technical details; this opens them at the region's row.
+function openCorrections(i) {
+  $("regions-tech").open = true;
+  const inp = state.techInputs[i];
+  if (inp) {
+    inp.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (inp.focus) inp.focus({ preventScroll: true });
+  }
 }
 
 // ---- source inspector: the original cells of the user's own file --------------------------------
@@ -482,6 +595,9 @@ function renderContract(contract) {
     : (keepTable && keepTable.columns.length ? keepTable.columns[0].id : null);
   show("s-contract", true);
   show("s-generate", true);
+  // Applied names that differ from the file mean the names were changed: the naming choice says so.
+  const renamed = contract.tables.some((t) => t.columns.some((c) => state.original[key(t.name, c.id)] !== undefined && c.name !== state.original[key(t.name, c.id)]));
+  if (renamed) { $("names-change").checked = true; $("names-keep").checked = false; }
   if (keepTable) selectColumn(keepTable.name, keepCol);
 }
 
@@ -536,6 +652,45 @@ function drawSheet() {
     el("p", { class: "hint", text: notes.join(" ") })];
   if (rowPanel) parts.push(el("button", { class: "tab" + (state.column === "" ? " sel" : ""), text: "Scenarios that concern whole rows", onclick: () => selectColumn(t.name, "") }));
   $("sheet").replaceChildren(...parts);
+  drawGenSummary();
+}
+
+// ---- step 5: what will be generated -----------------------------------------------------------
+// A short summary per table, with a few original rows (local only, like the grid of step 4) above
+// a few synthetic rows of the applied settings.
+const SUMMARY_ROWS = 3;
+function drawGenSummary() {
+  const box = $("gen-summary");
+  box.replaceChildren();
+  if (!state.contract) return;
+  box.append(el("h3", { text: "What will be generated" }));
+  if (dirty.contract) box.append(el("p", { class: "pill warn", text: "The column settings have unapplied changes: press \"Apply decisions\" in step 4 first." }));
+  state.contract.tables.forEach((t) => {
+    const kept = t.columns.filter((c) => state.fields[key(t.name, c.id)].keep.checked);
+    const left = t.columns.filter((c) => !state.fields[key(t.name, c.id)].keep.checked);
+    const name = (c) => state.fields[key(t.name, c.id)].name.value || c.id;
+    const card = el("div", { class: "sumcard" },
+      el("p", {}, el("strong", { text: "Table " + t.name + ": " }),
+        kept.length ? "synthetic values for " + kept.length + " column(s): " + kept.map(name).join(", ") + "."
+          : "no column is kept, so nothing is generated for it.",
+        left.length ? " Left out: " + left.map(name).join(", ") + "." : ""));
+    const original = (state.srcRows[t.name] || []).slice(0, SUMMARY_ROWS);
+    const sample = !state.sampleStale && state.sample ? state.sample[t.name] : null;
+    const synth = sample ? sample.rows.slice(0, SUMMARY_ROWS) : [];
+    if (kept.length && (original.length || synth.length)) {
+      const rows = original.map((r) => [el("td", { class: "rowhead", text: "your file, row " + r.row })].concat(kept.map((c) => {
+        const v = r.cells[Number(c.id.slice(1)) - 1];
+        return el("td", { class: "cell src", text: v === null || v === undefined ? "" : v });
+      })));
+      synth.forEach((row, i) => rows.push([el("td", { class: "rowhead", text: "synthetic " + (i + 1) })].concat(kept.map((c) => {
+        const j = sample.columns.indexOf(c.id);
+        return el("td", { class: "cell syn", text: j < 0 ? "" : row[j] });
+      }))));
+      card.append(table([""].concat(kept.map(name)), rows, { scroll: true }));
+    }
+    box.append(card);
+  });
+  box.append(el("p", { class: "hint", text: "Rows from your file are shown here on this machine only, for comparison. The synthetic rows show ordinary values; the generated file also contains the planned exception scenarios." }));
 }
 
 async function loadSample() {
@@ -562,6 +717,43 @@ async function loadSample() {
 
 // Column naming: the server's naming layer (the same as the command line's) computes the
 // names; the page only previews them or fills them into the fields, to be applied as usual.
+// The word lists below are fixed vocabularies of this page; none comes from the user's file.
+const THEMES = {
+  letters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split(""),
+  cities: ["Tokyo", "Paris", "London", "Cairo", "Lima", "Oslo", "Rome", "Seoul", "Lagos", "Delhi", "Madrid", "Berlin", "Sydney",
+    "Dakar", "Quito", "Hanoi", "Nairobi", "Vienna", "Lisbon", "Havana", "Toronto", "Mumbai", "Istanbul", "Bogota", "Prague",
+    "Dublin", "Athens", "Manila", "Santiago", "Helsinki"],
+  nato: ["Alpha", "Bravo", "Charlie", "Delta", "Echo", "Foxtrot", "Golf", "Hotel", "India", "Juliett", "Kilo", "Lima", "Mike",
+    "November", "Oscar", "Papa", "Quebec", "Romeo", "Sierra", "Tango", "Uniform", "Victor", "Whiskey", "Xray", "Yankee", "Zulu"],
+  rivers: ["Nile", "Amazon", "Yangtze", "Mississippi", "Danube", "Volga", "Mekong", "Congo", "Niger", "Ganges", "Rhine", "Seine",
+    "Thames", "Indus", "Tigris", "Euphrates", "Zambezi", "Orinoco", "Yukon", "Loire", "Elbe", "Murray", "Jordan", "Tagus",
+    "Ebro", "Dnieper", "Lena", "Amur", "Rhone", "Vistula"],
+  lakes: ["Baikal", "Victoria", "Titicaca", "Superior", "Geneva", "Como", "Tahoe", "Ontario", "Erie", "Huron", "Michigan", "Malawi",
+    "Tanganyika", "Ladoga", "Balaton", "Garda", "Constance", "Chad", "Toba", "Inle", "Bled", "Ohrid", "Lucerne", "Annecy",
+    "Taupo", "Nicaragua", "Winnipeg", "Vostok", "Kivu", "Van"],
+  stars: ["Mercury", "Venus", "Earth", "Mars", "Jupiter", "Saturn", "Uranus", "Neptune", "Pluto", "Sirius", "Vega", "Rigel",
+    "Altair", "Deneb", "Polaris", "Antares", "Betelgeuse", "Arcturus", "Capella", "Aldebaran", "Spica", "Procyon", "Canopus",
+    "Castor", "Pollux", "Regulus", "Mira", "Bellatrix", "Achernar", "Sol"],
+  scientists: ["Curie", "Newton", "Einstein", "Darwin", "Galileo", "Tesla", "Pasteur", "Lovelace", "Turing", "Bohr", "Kepler",
+    "Faraday", "Mendel", "Hypatia", "Noether", "Planck", "Fermi", "Feynman", "Hubble", "Copernicus", "Archimedes", "Euler",
+    "Gauss", "Avicenna", "Khwarizmi", "Lavoisier", "Maxwell", "Hawking", "Franklin", "Meitner"],
+};
+const UNITS = ["Zero", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve",
+  "Thirteen", "Fourteen", "Fifteen", "Sixteen", "Seventeen", "Eighteen", "Nineteen"];
+const TENS = ["", "", "Twenty", "Thirty", "Forty", "Fifty", "Sixty", "Seventy", "Eighty", "Ninety"];
+function numberWord(n) {
+  if (n < 20) return UNITS[n];
+  if (n < 100) return TENS[Math.floor(n / 10)] + (n % 10 ? "-" + UNITS[n % 10] : "");
+  return String(n);
+}
+// n names from a theme; a list that runs out starts again with a number (Tokyo, …, Tokyo2).
+function themeNames(theme, n) {
+  if (theme === "digits") return Array.from({ length: n }, (_, i) => String(i + 1));
+  if (theme === "words") return Array.from({ length: n }, (_, i) => numberWord(i + 1));
+  const words = THEMES[theme] || [];
+  return Array.from({ length: n }, (_, i) => words[i % words.length] + (i < words.length ? "" : String(Math.floor(i / words.length) + 1)));
+}
+
 function bulkColumns(t) {
   const target = $("bulk-target").value;
   const kept = t.columns.filter((c) => state.fields[key(t.name, c.id)].keep.checked);
@@ -574,6 +766,7 @@ function drawBulkColumns() {
   const box = $("bulk-cols");
   const selecting = $("bulk-target").value === "selected";
   box.hidden = !selecting || !t;
+  drawNamingTools();
   if (!t) return;
   const ticked = new Set(Array.from(document.querySelectorAll("#bulk-cols [data-col]")).filter((x) => x.checked).map((x) => x.dataset.col));
   if (box.dataset.table !== t.name) ticked.clear();  // a new table starts with nothing ticked
@@ -583,17 +776,71 @@ function drawBulkColumns() {
       " " + (state.fields[key(t.name, c.id)].name.value || c.id))));
 }
 
+// Shows only the controls of the chosen way of naming.
+function drawNamingTools() {
+  const change = $("names-change").checked;
+  const how = $("bulk-how").value;
+  const theme = $("bulk-theme").value;
+  $("bulk-tools").hidden = !change;
+  $("nm-prefix").hidden = how !== "prefix";
+  $("nm-suffix").hidden = how !== "suffix";
+  $("nm-theme").hidden = how !== "theme";
+  $("nm-list").hidden = !(how === "theme" && theme === "mine");
+  $("nm-actions").hidden = how === "custom";
+  $("names-custom").hidden = !change || how !== "custom";
+  if (change && how === "custom") drawCustomNames();
+}
+
+// "I will choose each name myself": one field per kept column, written straight into the column's own name field.
+function drawCustomNames() {
+  const t = currentTable();
+  const box = $("names-custom");
+  if (!t) { box.replaceChildren(); return; }
+  const rows = t.columns.filter((c) => state.fields[key(t.name, c.id)].keep.checked).map((c) => {
+    const f = state.fields[key(t.name, c.id)];
+    const inp = el("input", { type: "text", value: f.name.value, "aria-label": "New name of column " + c.id,
+      oninput: () => { f.name.value = inp.value; contractEdited(); } });
+    return [state.original[key(t.name, c.id)] || c.name, inp];
+  });
+  box.replaceChildren(el("p", { class: "hint", text: "Type the new name of each column. Press \"Apply decisions\" below to use them." }),
+    table(["Name in your file", "New name"], rows, { scroll: true }));
+}
+
+// Keep the names: every kept column of every table gets its name from the file back.
+function keepOriginalNames() {
+  let changed = 0;
+  (state.contract ? state.contract.tables : []).forEach((t) => t.columns.forEach((c) => {
+    const f = state.fields[key(t.name, c.id)];
+    const original = state.original[key(t.name, c.id)];
+    if (original !== undefined && f.name.value !== original) { f.name.value = original; changed += 1; }
+  }));
+  if (changed) {
+    contractEdited();
+    say(changed + " column name(s) were set back to the names in your file. Press \"Apply decisions\" to use them.", "info");
+  }
+}
+
 async function bulkPlan() {
   const t = currentTable();
   if (!t) return null;
   const { kept, selected } = bulkColumns(t);
-  const mode = $("bulk-mode").value;
+  const how = $("bulk-how").value;
+  const theme = $("bulk-theme").value;
+  let mode = "edit";
+  let names = null;
+  if (how === "theme" && theme === "greek") mode = "sequence";
+  else if (how === "theme" && theme === "mine") {
+    mode = "list";
+    names = $("bulk-names").value.split(/\r?\n/).filter((x, i, a) => i < a.length - 1 || x !== "");
+  } else if (how === "theme") {
+    mode = "list";
+    names = themeNames(theme, selected ? selected.length : kept.length);
+  }
   const body = {
-    table: t.name, mode, selected,
+    table: t.name, mode, selected, names,
     columns: kept.map((c) => ({ id: c.id, name: state.fields[key(t.name, c.id)].name.value })),
-    names: mode === "list" ? $("bulk-names").value.split(/\r?\n/).filter((x, i, a) => i < a.length - 1 || x !== "") : null,
     style: $("bulk-style").value, find: $("bulk-find").value, replace: $("bulk-replace").value,
-    prefix: $("bulk-prefix").value, suffix: $("bulk-suffix").value,
+    prefix: how === "prefix" ? $("bulk-prefix").value : "", suffix: how === "suffix" ? $("bulk-suffix").value : "",
   };
   try {
     const data = await api("/api/names", body);
@@ -601,7 +848,7 @@ async function bulkPlan() {
     return { t, plan: data.plan };
   } catch (e) {
     $("bulk-preview").replaceChildren();
-    say(e.message, "error");
+    say(e.message, "err");
     return null;
   }
 }
@@ -611,7 +858,7 @@ async function bulkPreview() {
   if (!res) return;
   const changed = res.plan.filter((p) => p.changed).length;
   $("bulk-preview").replaceChildren(
-    el("p", { class: "hint", text: changed + " of " + res.plan.length + " selected column(s) would change. Nothing is changed until you press \"Fill in the new names\" and then \"Apply decisions\"." }),
+    el("p", { class: "hint", text: changed + " of " + res.plan.length + " selected column(s) would change. Nothing is changed until you press \"Use these names\" and then \"Apply decisions\"." }),
     table(["Column", "Current name", "New name"], res.plan.map((p) => [p.id, p.current, p.new]), { scroll: true }));
 }
 
@@ -782,6 +1029,11 @@ async function init() {
     const chosen = document.querySelector("input[name=policy]:checked");
     if (!chosen) throw new Error("Choose a privacy policy first.");
     const data = await api("/api/profile", { policy: chosen.value });
+    // A fresh analysis carries the names as they are in the file: they are what "keep the names" restores.
+    state.original = {};
+    data.contract.tables.forEach((t) => t.columns.forEach((c) => { state.original[key(t.name, c.id)] = c.name; }));
+    $("names-keep").checked = true;
+    $("names-change").checked = false;
     state.report = data.report;
     renderReport(data.report);
     renderContract(data.contract);
@@ -796,6 +1048,10 @@ async function init() {
   $("btn-bulk-undo").addEventListener("click", () => bulkRename(true));
   $("btn-bulk-preview").addEventListener("click", () => bulkPreview());
   $("bulk-target").addEventListener("change", () => drawBulkColumns());
+  $("bulk-how").addEventListener("change", () => { $("bulk-preview").replaceChildren(); drawNamingTools(); });
+  $("bulk-theme").addEventListener("change", () => { $("bulk-preview").replaceChildren(); drawNamingTools(); });
+  $("names-keep").addEventListener("change", () => { $("bulk-preview").replaceChildren(); drawNamingTools(); keepOriginalNames(); });
+  $("names-change").addEventListener("change", () => drawNamingTools());
   $("btn-generate").addEventListener("click", () => busy($("btn-generate"), "Generating and assessing…", async () => {
     if (dirty.recipe) throw new Error("The table settings were changed but not applied. Apply them and analyse again before generating.");
     if (dirty.contract) throw new Error("The column settings have unapplied changes. Click 'Apply decisions' first; nothing was generated.");
