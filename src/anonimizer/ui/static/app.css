@@ -82,14 +82,36 @@ button.primary, a.btn { background:var(--m, var(--accent)); border-color:var(--m
 @media (max-width: 900px) { .split { grid-template-columns:minmax(0, 1fr); } .split > aside { position:static; order:-1; } }
 
 /* Regions: one line each; the details open on a click. */
-.cards { display:flex; flex-direction:column; gap:6px; margin:8px 0; }
+.cards { margin:8px 0; }
 .card { border:1px solid var(--line); border-radius:8px; background:#fff; }
 .card > summary { list-style:none; padding:8px 12px; }
 .card > summary::-webkit-details-marker { display:none; }
 .card > summary::before { content:"\25B8"; color:var(--muted); margin-right:2px; }
 .card[open] > summary::before { content:"\25BE"; }
 .card[open] > summary { border-bottom:1px solid var(--line); }
-.card-body { display:flex; flex-direction:column; gap:6px; padding:10px 12px; max-width:520px; }
+.card-body { display:flex; flex-direction:column; gap:8px; padding:10px 12px; min-width:0; }
+.card-fields { display:flex; flex-direction:column; gap:6px; max-width:520px; }
+.meta { font-size:12px; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+.card-top .rname { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; max-width:40%; }
+.card-top .pill { flex-shrink:0; }
+
+/* The two groups of regions: tables first, small regions and notes collapsed below. */
+.rgroup { margin:8px 0; }
+.rgroup h3 { margin:6px 0; color:var(--mh); }
+.rgroup .count { color:var(--muted); font-weight:400; }
+.rgroup > .card { margin:6px 0; }
+details.rgroup.small { border:1px dashed var(--line); border-radius:8px; padding:6px 10px; background:#fafbfc; }
+details.rgroup.small > summary { font-size:15px; color:var(--mh); padding:2px 0; }
+details.rgroup.small > .hint { margin-top:6px; }
+
+/* Small preview of one region, inside its line. Bounded both ways; wide tables scroll sideways. */
+.mini { min-width:0; }
+.mini-grid { max-height:220px; max-width:100%; }
+table.mini-table { width:auto; font-size:12px; }
+table.mini-table th { background:var(--mbg); color:var(--ink); font-family:ui-monospace, Menlo, Consolas, monospace; font-weight:700; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
+table.mini-table th.corner { background:#eef1f5; font-family:inherit; }
+table.mini-table td { color:var(--ink); max-width:180px; }
+button.small-btn { padding:4px 10px; font-weight:600; border-color:var(--m, var(--accent)); color:var(--mh, var(--accent)); white-space:nowrap; }
 .rname { font-weight:700; }
 .kind { font-size:12px; color:var(--muted); border:1px solid var(--line); border-radius:4px; padding:0 6px; }
 .card.low { border-color:#ecd3a4; background:#fffbf2; }
